@@ -53,21 +53,21 @@ class DataCache {
 public:
     DataCache(size_t capacity_in_pages=0);
     ~DataCache();
-    bool Exists(const uint8_t stream_id, const uint64_t lpa);
+    bool Exists(const uint32_t stream_id, const uint64_t lpa);
     bool Empty();
     bool Full();
     bool CheckFreeSlotAvailability();
     bool CheckFreeSlotAvailability(uint64_t required_free_slots);
 
-    PageDataCacheSlot GetSlot(const uint8_t stream_id, const uint64_t lpa);
+    PageDataCacheSlot GetSlot(const uint32_t stream_id, const uint64_t lpa);
     PageDataCacheSlot EvictOneDirtyPage();
     PageDataCacheSlot EvictOnePageLRU();
 
-    void ChangeSlotStatusToWriteBack(const uint8_t stream_id, const uint64_t lpa);
-    void RemoveSlot(const uint8_t stream_id, const uint64_t lpa);
-    void InsertReadData(const uint8_t stream_id, const uint64_t lpa, const std::vector<uint8_t>& data,const uint64_t timestamp, const uint64_t read_sector_bitmap);
-    void InsertWriteData(const uint8_t stream_id, const uint64_t lpa, const std::vector<uint8_t>& data,const uint64_t timestamp, const uint64_t write_sector_bitmap);
-    void UpdateData(const uint8_t stream_id, const uint64_t lpa, const std::vector<uint8_t>& data,const uint64_t timestamp, const uint64_t write_sector_bitmap);
+    void ChangeSlotStatusToWriteBack(const uint32_t stream_id, const uint64_t lpa);
+    void RemoveSlot(const uint32_t stream_id, const uint64_t lpa);
+    void InsertReadData(const uint32_t stream_id, const uint64_t lpa, const std::vector<uint8_t>& data,const uint64_t timestamp, const uint64_t read_sector_bitmap);
+    void InsertWriteData(const uint32_t stream_id, const uint64_t lpa, const std::vector<uint8_t>& data,const uint64_t timestamp, const uint64_t write_sector_bitmap);
+    void UpdateData(const uint32_t stream_id, const uint64_t lpa, const std::vector<uint8_t>& data,const uint64_t timestamp, const uint64_t write_sector_bitmap);
 
 private:
     std::unordered_map<uint64_t, PageDataCacheSlotPtr> slots; // key: LPN_TO_UNIQUE_KEY(STREAM,LPA)

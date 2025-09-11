@@ -10,8 +10,8 @@ enum class Cache_Sharing_Mode { SHARED,//each application has access to the enti
 class CacheManager { 
 public:
     CacheManager(FTLPtr ftl_ptr,NandDrivePtr nand_drive_ptr,uint64_t capacity_in_bytes,
-    Caching_Mode* caching_mode_per_stream,Cache_Sharing_Mode cache_sharing_mode,uint8_t stream_cnt,
-    CacheParam* cache_param_per_stream,uint64_t back_pressure_buffer_max_depth);
+    Caching_Mode* caching_mode_per_stream,Cache_Sharing_Mode cache_sharing_mode,uint32_t stream_cnt,
+    uint64_t sector_per_page,uint64_t back_pressure_buffer_max_depth);
     ~CacheManager();
 
     void check_read(uint64_t stream_id, const uint64_t lpa, std::vector<uint8_t>& data, const uint64_t timestamp);

@@ -18,7 +18,7 @@ void NandDrive::init() {
 int NandDrive::erase_block(const Addr *addr) {
     if (!addr) return -1;
     if (addr->die >= DIE_CNT || addr->plane >= PLANE_CNT || addr->block >= BLOCK_CNT) return -1;
-    for (uint16_t p = 0; p < PAGE_CNT; p++) {
+    for (uint32_t p = 0; p < PAGE_CNT; p++) {
         Addr tmp{addr->die, addr->plane, addr->block, p};
         std::memset(page_ptr(buffer, &tmp), 0xFF, PAGE_TOTAL_BYTES);
     }
