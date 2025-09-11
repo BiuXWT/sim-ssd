@@ -11,7 +11,16 @@
 #include <map>
 #include <memory>
 #include <cassert>
+#include <random>
 #include <algorithm>
+
+#define PRINT_ERROR(MSG) {\
+							std::cerr << "ERROR:" ;\
+							std::cerr << MSG << std::endl; \
+							std::cin.get();\
+							exit(1);\
+						 }
+#define PRINT_MESSAGE(M) std::cout << M << std::endl;
 
 
 enum class MAPPING_MODE

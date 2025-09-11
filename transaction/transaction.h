@@ -13,6 +13,7 @@ using TransactionErasePtr = std::shared_ptr<TransactionErase>;
 
 
 class PhysicalPageAddress{
+public:
     uint32_t channel_id;
     uint32_t chip_id;
     uint32_t die_id;

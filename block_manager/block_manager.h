@@ -20,7 +20,7 @@ public:
     BlockServiceStatus current_status;
     uint32_t invalid_page_count;
     static uint32_t page_bitmap_size;
-    uint64_t* invalid_page_bitmap;
+    std::vector<uint64_t> invalid_page_bitmap;
     uint32_t erase_count;
     TransactionErasePtr ongoing_erase_tr;
     uint32_t stream_id;
@@ -40,9 +40,9 @@ public:
     uint32_t valid_pages_count;
     uint32_t invalid_pages_count;
 
-    std::vector<std::vector<BlockPtr>> data_open_blocks; // per stream_id
-    std::vector<std::vector<BlockPtr>> gc_open_blocks; // per stream_id
-    std::vector<std::vector<BlockPtr>> translation_gc_open_blocks; // per stream_id
+    std::vector<BlockPtr> data_open_blocks; // per stream_id
+    std::vector<BlockPtr> gc_open_blocks; // per stream_id
+    std::vector<BlockPtr> translation_open_blocks; // per stream_id
 
     std::queue<uint64_t> block_usage_history; //block 使用历史，存放block_id
     std::set<uint64_t> ongoing_erase_blocks; // 正在擦除的block_id
@@ -67,7 +67,7 @@ class BlockManager {
     void AllocateBlockAndPageInPlaneForTranslationGcWrite(const uint32_t stream_id, PhysicalPageAddress &page_address);
     void InvalidatePageInBlock(const uint32_t stream_id, const PhysicalPageAddress &page_address);
     void AddErasedBlockToPool(const PhysicalPageAddress &block_address);
-    uint32_t GetPoolSize(const PhysicalPageAddress &plane_address);
+    uint32_t GetFreeBlockPoolSize(const PhysicalPageAddress &plane_address);
 
     uint32_t GetColdestBlockId(const PhysicalPageAddress &plane_address);
     uint32_t GetMinMaxEraseDifference(const PhysicalPageAddress &plane_address);
@@ -87,7 +87,7 @@ class BlockManager {
 private:
     GarbageCollectionPtr gc_unit;
     // 定义一个[channel] [chip] [die] [plane]：4维数组
-    std::vector<std::vector<std::vector<std::vector<PlaneBookKeeping>>>> plane_manager;
+    std::vector<std::vector<std::vector<std::vector<PlaneBookKeepingPtr>>>> plane_manager;
 
     uint64_t block_pe_cycle; // 每个块的擦写寿命
     uint64_t total_stream_count;
@@ -100,3 +100,4 @@ private:
 
     void ProgramTransactionIssued(PhysicalPageAddress &page_address);
 };
+using BlockManagerPtr = std::shared_ptr<BlockManager>;
