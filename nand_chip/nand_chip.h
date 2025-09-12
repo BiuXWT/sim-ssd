@@ -19,7 +19,6 @@ public:
 class Plane{
     private:
     double bad_block_ratio = 0.02; // 坏块比例
-    std::vector<uint32_t> bad_block_ids;
     void set_random_bad_blocks(){
         uint32_t bad_block_count = static_cast<uint32_t>(blocks_no * bad_block_ratio);
         if(bad_block_count == 0 && bad_block_ratio > 0) bad_block_count = 2; // 至少2个坏块
@@ -38,7 +37,7 @@ public:
         : blocks_no(blocks_per_plane), pages_per_block(pages_per_block) {
         blocks.reserve(blocks_no);
         for (uint32_t i = 0; i < blocks_no; ++i) {
-            blocks.emplace_back(i, page_size);
+            blocks.emplace_back(i, pages_per_block, page_size);
         }
         set_random_bad_blocks();
     }
@@ -52,8 +51,8 @@ public:
 
 
 class Die{
-    enum class DieStatus { BUSY, IDLE };
 public:
+    enum class DieStatus { BUSY, IDLE };
     uint32_t plane_no;
     DieStatus status;
     std::vector<Plane> planes;
@@ -73,7 +72,7 @@ class NandChip {
 
 public:
     NandChip(uint32_t channel_id, uint32_t chip_id, uint32_t dies_per_chip, uint32_t planes_per_die,
-             uint32_t blocks_per_plane, uint32_t pages_per_block);
+             uint32_t blocks_per_plane, uint32_t pages_per_block,uint32_t page_size);
     ~NandChip();
     uint32_t channel_id;
     uint32_t chip_id;

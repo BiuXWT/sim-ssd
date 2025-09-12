@@ -1,65 +1,73 @@
 #include "nand_chip.h"
+#include <cstring>
+#include <cstdio>
 
-NandChip::NandChip() {
-    buffer = new uint8_t[TOTAL_BYTES];
-    init();
+NandChip::NandChip(uint32_t channel_id, uint32_t chip_id, uint32_t dies_per_chip, uint32_t planes_per_die,
+                   uint32_t blocks_per_plane, uint32_t pages_per_block, uint32_t page_size)
+    : channel_id(channel_id), chip_id(chip_id) {
+    dies.resize(dies_per_chip);
+    for (uint32_t i = 0; i < dies_per_chip; ++i) {
+        dies[i].plane_no = planes_per_die;
+        dies[i].status = Die::DieStatus::IDLE;
+        dies[i].planes.reserve(planes_per_die);
+        for (uint32_t j = 0; j < planes_per_die; ++j) {
+            dies[i].planes.emplace_back(blocks_per_plane, pages_per_block, page_size);
+        }
+    }
 }
 
 NandChip::~NandChip() {
-    delete[] buffer;
-    buffer = nullptr;
 }
 
-void NandChip::init() {
-    if (!buffer) return; 
-    std::memset(buffer, 0xFF, TOTAL_BYTES);
+std::vector<uint8_t> NandChip::GetMetaData(uint32_t die, uint32_t plane, uint32_t block, uint32_t page) {
+    if (die >= dies.size() || plane >= dies[die].planes.size() || 
+        block >= dies[die].planes[plane].blocks.size() || 
+        page >= dies[die].planes[plane].pages_per_block) {
+        return std::vector<uint8_t>(); // 返回空向量表示错误
+    }
+    
+    // 返回元数据，这里可以根据需要自定义
+    std::vector<uint8_t> metadata(16, 0x00); // 假设元数据长度为16字节
+    return metadata;
 }
 
 int NandChip::erase_block(const Addr *addr) {
     if (!addr) return -1;
-    if (addr->die >= DIE_CNT || addr->plane >= PLANE_CNT || addr->block >= BLOCK_CNT) return -1;
-    for (uint32_t p = 0; p < PAGE_CNT; p++) {
-        Addr tmp{addr->die, addr->plane, addr->block, p};
-        std::memset(page_ptr(buffer, &tmp), 0xFF, PAGE_TOTAL_BYTES);
+    if (addr->die >= dies.size() || addr->plane >= dies[addr->die].planes.size() || 
+        addr->block >= dies[addr->die].planes[addr->plane].blocks.size()) {
+        return -1;
+    }
+    
+    // 擦除整个块，将所有页重置为0xFF
+    Block& block = dies[addr->die].planes[addr->plane].blocks[addr->block];
+    for (auto& page : block.pages) {
+        std::fill(page.data.begin(), page.data.end(), 0xFF);
     }
     return 0;
 }
 
-int NandChip::write_page(const Addr *addr, const uint8_t *main) {
-    if (!addr) return -1;
-    if (addr->die >= DIE_CNT || addr->plane >= PLANE_CNT || addr->block >= BLOCK_CNT || addr->page >= PAGE_CNT) return -1;
-    if (!main) return -1;
-    uint8_t* ptr = page_ptr(buffer, addr);
-    std::memcpy(ptr, main, PG_SZ);
+int NandChip::write_page(const Addr *addr, const uint8_t *data) {
+    if (!addr || !data) return -1;
+    if (addr->die >= dies.size() || addr->plane >= dies[addr->die].planes.size() || 
+        addr->block >= dies[addr->die].planes[addr->plane].blocks.size() ||
+        addr->page >= dies[addr->die].planes[addr->plane].pages_per_block) {
+        return -1;
+    }
+    
+    Page& page = dies[addr->die].planes[addr->plane].blocks[addr->block].pages[addr->page];
+    std::memcpy(page.data.data(), data, page.data.size());
     return 0;
 }
 
-int NandChip::read_page(const Addr *addr, uint8_t *main) {
-    if (!addr) return -1;
-    if (addr->die >= DIE_CNT || addr->plane >= PLANE_CNT || addr->block >= BLOCK_CNT || addr->page >= PAGE_CNT) return -1;
-    if (!main) return -1;
-    uint8_t* ptr = page_ptr(buffer, addr);
-    std::memcpy(main, ptr, PG_SZ);
+int NandChip::read_page(const Addr *addr, uint8_t *data) {
+    if (!addr || !data) return -1;
+    if (addr->die >= dies.size() || addr->plane >= dies[addr->die].planes.size() || 
+        addr->block >= dies[addr->die].planes[addr->plane].blocks.size() ||
+        addr->page >= dies[addr->die].planes[addr->plane].pages_per_block) {
+        return -1;
+    }
+    
+    const Page& page = dies[addr->die].planes[addr->plane].blocks[addr->block].pages[addr->page];
+    std::memcpy(data, page.data.data(), page.data.size());
     return 0;
-}
-
-void NandChip::print_page(const Addr *addr) {
-    if (!addr) return;
-    uint8_t* ptr = page_ptr(buffer, addr);
-    std::printf("Die %u Plane %u Block %u Page %u Main: ", addr->die, addr->plane, addr->block, addr->page);
-    for (int i = 0; i < 16 && i < PG_SZ; i++) std::printf("%02X ", ptr[i]);
-    std::printf("\n");
-}
-
-int NandChip::addr_valid(const Addr *addr) {
-    if (!addr) return 0;
-    if (addr->die >= DIE_CNT) return 0;
-    if (addr->plane >= PLANE_CNT) return 0;
-    if (addr->block >= BLOCK_CNT) return 0;
-    if (addr->page >= PAGE_CNT) return 0;
-    return 1;
-}
-
-int NandChip::total_size_MB() const {
-    return static_cast<int>(TOTAL_USER_BYTES / (1024 * 1024));
 }

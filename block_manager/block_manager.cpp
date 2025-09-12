@@ -1,8 +1,10 @@
 #include "block_manager.h"
+#include "transaction.h"
+#include "gc_wl.h"
 
-uint32_t Block::page_bitmap_size = 0;
+uint32_t BlockSlot::page_bitmap_size = 0;
 
-void Block::Erase()
+void BlockSlot::Erase()
 {
     current_write_page_index = 0;
     invalid_page_count = 0;
@@ -55,7 +57,7 @@ void PlaneBookKeeping::AddToFreeBlockPool(BlockPtr block, bool consider_dynamic_
     }
 }
 
-BlockManager::BlockManager(GarbageCollectionPtr gc_ptr, uint32_t block_pe_cycle,
+BlockManager::BlockManager(GcWlUnitPtr gc_ptr, uint32_t block_pe_cycle,
                            uint32_t total_stream_count, uint32_t total_channel_count, uint32_t chips_per_channel,
                            uint32_t dies_per_chip, uint32_t planes_per_die, uint32_t blocks_per_plane,
                            uint32_t pages_per_block)
@@ -87,7 +89,7 @@ BlockManager::BlockManager(GarbageCollectionPtr gc_ptr, uint32_t block_pe_cycle,
 
                     for(size_t block_id = 0; block_id < blocks_per_plane; block_id++)
                     {
-                        plane->blocks[block_id] = std::make_shared<Block>();
+                        plane->blocks[block_id] = std::make_shared<BlockSlot>();
                         auto block = plane->blocks[block_id];
                         block->block_id = block_id;
                         block->current_write_page_index = 0;
@@ -106,9 +108,9 @@ BlockManager::BlockManager(GarbageCollectionPtr gc_ptr, uint32_t block_pe_cycle,
                         // 1. 一个uint64_t有64位，可以表示64个页的状态
                         // 2. pages_per_block/(8*sizeof(uint64_t)) 计算能被完整uint64_t覆盖的页组数
                         // 3. pages_per_block%(8*sizeof(uint64_t))?1:0 判断是否有剩余页，若有则再多分配一个uint64_t
-                        Block::page_bitmap_size = pages_per_block/(8*sizeof(uint64_t))+(pages_per_block%(8*sizeof(uint64_t))?1:0);
-                        block->invalid_page_bitmap.resize(Block::page_bitmap_size);
-                        for (size_t i = 0; i < Block::page_bitmap_size; i++)
+                        BlockSlot::page_bitmap_size = pages_per_block/(8*sizeof(uint64_t))+(pages_per_block%(8*sizeof(uint64_t))?1:0);
+                        block->invalid_page_bitmap.resize(BlockSlot::page_bitmap_size);
+                        for (size_t i = 0; i < BlockSlot::page_bitmap_size; i++)
                         {
                             block->invalid_page_bitmap[i] = 0ULL;
                         }
@@ -185,7 +187,7 @@ uint32_t BlockManager::GetMinMaxEraseDifference(const PhysicalPageAddress &plane
 
 PlaneBookKeepingPtr BlockManager::GetPlaneBookKeepingEntry(const PhysicalPageAddress &plane_address)
 {
-    return PlaneBookKeepingPtr();
+    return plane_manager[plane_address.channel_id][plane_address.chip_id][plane_address.die_id][plane_address.plane_id];
 }
 
 bool BlockManager::BlockHasOngoingGC(const PhysicalPageAddress &block_address)

@@ -1,7 +1,8 @@
 #pragma once
 #include "param.h"
-#include "transaction.h"
-#include "garbage_collection.h"
+
+
+
 
 enum class BlockServiceStatus
 {
@@ -13,7 +14,7 @@ enum class BlockServiceStatus
     GC_USER_UWAIT
 };
 
-class Block{
+class BlockSlot{
 public:
     uint32_t block_id;
     uint32_t current_write_page_index;
@@ -32,7 +33,6 @@ public:
     bool is_bad=false;
     void Erase();
 };
-using BlockPtr = std::shared_ptr<Block>;
 
 class PlaneBookKeeping {
 public:
@@ -57,10 +57,10 @@ public:
     std::vector<BlockPtr> bad_blocks;
     std::multimap<uint64_t,BlockPtr> free_block_pool; // key: erase_count, value: block_ptr
 };
-using PlaneBookKeepingPtr = std::shared_ptr<PlaneBookKeeping>;
 
 class BlockManager {
-    BlockManager(GarbageCollectionPtr gc_ptr,uint32_t block_pe_cycle,uint32_t total_stream_count,
+public:
+    BlockManager(GcWlUnitPtr gc_ptr,uint32_t block_pe_cycle,uint32_t total_stream_count,
     uint32_t total_channel_count,uint32_t chips_per_channel,uint32_t dies_per_chip,
     uint32_t planes_per_die,uint32_t blocks_per_plane,uint32_t pages_per_block);
     ~BlockManager();
@@ -73,7 +73,7 @@ class BlockManager {
 
     uint32_t GetColdestBlockId(const PhysicalPageAddress &plane_address);
     uint32_t GetMinMaxEraseDifference(const PhysicalPageAddress &plane_address);
-    void SetGarbageCollectionUnit(GarbageCollectionPtr gc_ptr) { gc_unit = gc_ptr; }
+    void SetGarbageCollectionUnit(GcWlUnitPtr gc_ptr) { gc_unit = gc_ptr; }
     PlaneBookKeepingPtr GetPlaneBookKeepingEntry(const PhysicalPageAddress &plane_address);
     bool BlockHasOngoingGC(const PhysicalPageAddress &block_address);
     bool CanExecGC(const PhysicalPageAddress &block_address);
@@ -87,7 +87,7 @@ class BlockManager {
     bool IsPageValid(const PhysicalPageAddress &page_address);
 
 private:
-    GarbageCollectionPtr gc_unit;
+    GcWlUnitPtr gc_unit;
     // 定义一个[channel] [chip] [die] [plane]：4维数组
     std::vector<std::vector<std::vector<std::vector<PlaneBookKeepingPtr>>>> plane_manager;
 
@@ -102,4 +102,3 @@ private:
 
     void ProgramTransactionIssued(PhysicalPageAddress &page_address);
 };
-using BlockManagerPtr = std::shared_ptr<BlockManager>;

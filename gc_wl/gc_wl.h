@@ -1,48 +1,37 @@
 #pragma once
 #include "param.h"
-#include "address_mapping.h"
-#include "block_manager.h"
-#include "nand_chip.h"
 
-class GarbageCollection;
-using GarbageCollectionPtr = std::shared_ptr<GarbageCollection>;
 /*
 •	GREEDY：效率优先，磨损不均。
 •	RGA：兼顾效率和均衡。
 •	RANDOM/RANDOM_P/RANDOM_PP：均衡优先，效率较低。
-•	FIFO：顺序回收，简单易实现。 */
-enum class GC_POLICY
-{
-    GREEDY,
-    RGA,
-    RANDOM,
-    RANDOM_P,
-    RANDOM_PP,
-    FIFO,
-};
+•	FIFO：顺序回收，简单易实现。 
+*/
 
-class GarbageCollection
+class GcWlUnit
 {
 public:
-    GarbageCollection();
-    ~GarbageCollection();
+    GcWlUnit();
+    ~GcWlUnit();
 
     bool GcIsUrgentMode(NandChipPtr chip);
-    void CheckGcRequired(const uint32_t block_pool_size, const PhysicalPageAddress &plane_address);
+    void CheckGcRequired(const uint32_t free_block_pool_size, const PhysicalPageAddress &plane_address);
     GC_POLICY GetGcPolicy() const { return gc_policy; }
     uint32_t GetGcPolicySpecificParam();
     uint32_t GetMinimumNumberOfFreePagesBeforeGc();
     bool StopServicingWrites(const PhysicalPageAddress &plane_address);
+    bool IsSafeGcCandidate(PlaneBookKeepingPtr plane, uint32_t gc_candidate_block_id);
 
 private:
     GC_POLICY gc_policy;
     AddressMappingPtr address_mapping;
     BlockManagerPtr block_manager;
-    NandRuntimePtr nand_runtime;
+    NandDriverPtr nand_driver;
 
     bool use_copyback;
     bool preemptible_gc_enabled;
     double gc_hard_threshold;
+    uint32_t block_pool_gc_threshold;
     uint32_t block_pool_gc_hard_threshold;
     uint32_t max_ongoing_gc_reqs_per_plane;
     uint32_t rga_set_size;

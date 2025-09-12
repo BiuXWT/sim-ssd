@@ -20,7 +20,7 @@ list(FILTER SOURCES EXCLUDE REGEX ".*/CMakeFiles/.*")
 include_directories(
     ./
     ${PROJECT_SOURCE_DIR}/transaction
-    ${PROJECT_SOURCE_DIR}/garbage_collection
+    ${PROJECT_SOURCE_DIR}/gc_wl
     ${PROJECT_SOURCE_DIR}/nand_chip
     ${PROJECT_SOURCE_DIR}/nand_driver
     ${PROJECT_SOURCE_DIR}/address_mapping

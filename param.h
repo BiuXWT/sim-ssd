@@ -44,10 +44,14 @@ enum class SLC_CACHE_MODE{
     SLC_CACHE_MODE_DYNAMIC
 };
 
-enum class GC_POLICY{
-    GC_MODE_NONE,
-    GC_MODE_GREEDY,
-    GC_MODE_COST_BENEFIT
+enum class GC_POLICY
+{
+    GREEDY,
+    RGA,
+    RANDOM,
+    RANDOM_P,
+    RANDOM_PP,
+    FIFO
 };
 
 enum class TransactionType
@@ -89,7 +93,7 @@ struct CacheParam
 
 struct GcParam
 {
-    GC_POLICY mode=GC_POLICY::GC_MODE_GREEDY;
+    GC_POLICY mode=GC_POLICY::GREEDY;
     double gc_threshold_high=0.8;
     double gc_threshold_low=0.2;
 };
@@ -124,3 +128,26 @@ struct Config{
     NandParam nand_param;
 
 };
+
+
+class UserRequest;
+class TransactionErase;
+class PlaneBookKeeping;
+class BlockManager;
+class BlockSlot;
+class AddressMapping;
+class NandDriver;
+class NandChip;
+class PhysicalPageAddress;
+class GcWlUnit;
+
+using UserRequestPtr = std::shared_ptr<UserRequest>;
+using AddressMappingPtr = std::shared_ptr<AddressMapping>;
+using BlockPtr = std::shared_ptr<BlockSlot>;
+using BlockManagerPtr = std::shared_ptr<BlockManager>;
+using PlaneBookKeepingPtr = std::shared_ptr<PlaneBookKeeping>;
+using NandDriverPtr = std::shared_ptr<NandDriver>;
+using NandChipPtr = std::shared_ptr<NandChip>;
+using PhysicalPageAddressPtr = std::shared_ptr<PhysicalPageAddress>;
+using GcWlUnitPtr = std::shared_ptr<GcWlUnit>;
+using TransactionErasePtr = std::shared_ptr<TransactionErase>;
