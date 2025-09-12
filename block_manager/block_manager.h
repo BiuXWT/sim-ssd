@@ -29,6 +29,7 @@ public:
     bool has_ongoing_gc;
     int ongoing_user_read_cnt;
     int ongoing_user_program_cnt;
+    bool is_bad=false;
     void Erase();
 };
 using BlockPtr = std::shared_ptr<Block>;
@@ -53,6 +54,7 @@ public:
     void AddToFreeBlockPool(BlockPtr block, bool consider_dynamic_wl);
 
     std::vector<BlockPtr> blocks;
+    std::vector<BlockPtr> bad_blocks;
     std::multimap<uint64_t,BlockPtr> free_block_pool; // key: erase_count, value: block_ptr
 };
 using PlaneBookKeepingPtr = std::shared_ptr<PlaneBookKeeping>;

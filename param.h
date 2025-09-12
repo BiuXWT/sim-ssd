@@ -44,7 +44,7 @@ enum class SLC_CACHE_MODE{
     SLC_CACHE_MODE_DYNAMIC
 };
 
-enum class GC_MODE{
+enum class GC_POLICY{
     GC_MODE_NONE,
     GC_MODE_GREEDY,
     GC_MODE_COST_BENEFIT
@@ -89,7 +89,7 @@ struct CacheParam
 
 struct GcParam
 {
-    GC_MODE mode=GC_MODE::GC_MODE_GREEDY;
+    GC_POLICY mode=GC_POLICY::GC_MODE_GREEDY;
     double gc_threshold_high=0.8;
     double gc_threshold_low=0.2;
 };

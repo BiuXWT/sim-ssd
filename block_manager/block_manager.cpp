@@ -146,7 +146,7 @@ void BlockManager::AllocateBlockAndPageInPlaneForUserWrite(const uint32_t stream
     {
         // 当前块写满，分配新块
         plane->data_open_blocks[stream_id] = plane->GetOneFreeBlock(stream_id, false);
-        gc_unit->check_gc_required(plane->GetFreeBlockCount(), page_address);
+        gc_unit->CheckGcRequired(plane->GetFreeBlockCount(), page_address);
     }
     plane->CheckBookKeepingCorrectness(page_address);
 }

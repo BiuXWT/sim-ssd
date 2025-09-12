@@ -21,8 +21,8 @@ include_directories(
     ./
     ${PROJECT_SOURCE_DIR}/transaction
     ${PROJECT_SOURCE_DIR}/garbage_collection
-    ${PROJECT_SOURCE_DIR}/nand_drive
-    ${PROJECT_SOURCE_DIR}/nand_runtime
+    ${PROJECT_SOURCE_DIR}/nand_chip
+    ${PROJECT_SOURCE_DIR}/nand_driver
     ${PROJECT_SOURCE_DIR}/address_mapping
     ${PROJECT_SOURCE_DIR}/block_manager
     ${PROJECT_SOURCE_DIR}/cache_manager
