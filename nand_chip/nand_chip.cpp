@@ -2,15 +2,15 @@
 #include <cstring>
 #include <cstdio>
 
-NandChip::NandChip(uint32_t channel_id, uint32_t chip_id, uint32_t dies_per_chip, uint32_t planes_per_die,
-                   uint32_t blocks_per_plane, uint32_t pages_per_block, uint32_t page_size)
+NandChip::NandChip(uint64_t channel_id, uint64_t chip_id, uint64_t dies_per_chip, uint64_t planes_per_die,
+                   uint64_t blocks_per_plane, uint64_t pages_per_block, uint64_t page_size)
     : channel_id(channel_id), chip_id(chip_id) {
     dies.resize(dies_per_chip);
-    for (uint32_t i = 0; i < dies_per_chip; ++i) {
+    for (uint64_t i = 0; i < dies_per_chip; ++i) {
         dies[i].plane_no = planes_per_die;
         dies[i].status = Die::DieStatus::IDLE;
         dies[i].planes.reserve(planes_per_die);
-        for (uint32_t j = 0; j < planes_per_die; ++j) {
+        for (uint64_t j = 0; j < planes_per_die; ++j) {
             dies[i].planes.emplace_back(blocks_per_plane, pages_per_block, page_size);
         }
     }
@@ -19,7 +19,7 @@ NandChip::NandChip(uint32_t channel_id, uint32_t chip_id, uint32_t dies_per_chip
 NandChip::~NandChip() {
 }
 
-std::vector<uint8_t> NandChip::GetMetaData(uint32_t die, uint32_t plane, uint32_t block, uint32_t page) {
+std::vector<uint8_t> NandChip::GetMetaData(uint64_t die, uint64_t plane, uint64_t block, uint64_t page) {
     if (die >= dies.size() || plane >= dies[die].planes.size() || 
         block >= dies[die].planes[plane].blocks.size() || 
         page >= dies[die].planes[plane].pages_per_block) {

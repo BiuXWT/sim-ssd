@@ -10,7 +10,7 @@ enum class Cache_Sharing_Mode { SHARED,//each application has access to the enti
 class CacheManager { 
 public:
     CacheManager(FTLPtr ftl_ptr,NandDrivePtr nand_drive_ptr,uint64_t capacity_in_bytes,
-    Caching_Mode* caching_mode_per_stream,Cache_Sharing_Mode cache_sharing_mode,uint32_t stream_cnt,
+    Caching_Mode* caching_mode_per_stream,Cache_Sharing_Mode cache_sharing_mode,uint64_t stream_cnt,
     uint64_t sector_per_page,uint64_t back_pressure_buffer_max_depth);
     ~CacheManager();
 

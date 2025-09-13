@@ -5,7 +5,7 @@ DataCache::DataCache(size_t capacity_in_pages)
 
 DataCache::~DataCache() {}
 
-bool DataCache::Exists(const uint32_t stream_id, const uint64_t lpa) {
+bool DataCache::Exists(const uint64_t stream_id, const uint64_t lpa) {
     uint64_t key = LPN_TO_UNIQUE_KEY(stream_id, lpa);
     return slots.find(key) != slots.end();
 }
@@ -26,7 +26,7 @@ bool DataCache::CheckFreeSlotAvailability(uint64_t required_free_slots) {
     return slots.size() + required_free_slots <= capacity_in_pages;
 }
 
-PageDataCacheSlot DataCache::GetSlot(const uint32_t stream_id, const uint64_t lpa) {
+PageDataCacheSlot DataCache::GetSlot(const uint64_t stream_id, const uint64_t lpa) {
     uint64_t key = LPN_TO_UNIQUE_KEY(stream_id, lpa);
     auto it = slots.find(key);
     if (it == slots.end()) {
@@ -73,7 +73,7 @@ PageDataCacheSlot DataCache::EvictOnePageLRU() {
     return evicted_item;
 }
 
-void DataCache::ChangeSlotStatusToWriteBack(const uint32_t stream_id, const uint64_t lpa) {
+void DataCache::ChangeSlotStatusToWriteBack(const uint64_t stream_id, const uint64_t lpa) {
     uint64_t key = LPN_TO_UNIQUE_KEY(stream_id, lpa);
     auto it = slots.find(key);
     if (it != slots.end()) {
@@ -81,7 +81,7 @@ void DataCache::ChangeSlotStatusToWriteBack(const uint32_t stream_id, const uint
     }
 }
 
-void DataCache::RemoveSlot(const uint32_t stream_id, const uint64_t lpa) {
+void DataCache::RemoveSlot(const uint64_t stream_id, const uint64_t lpa) {
     uint64_t key = LPN_TO_UNIQUE_KEY(stream_id, lpa);
     auto it = slots.find(key);
     if (it != slots.end()) {
@@ -90,7 +90,7 @@ void DataCache::RemoveSlot(const uint32_t stream_id, const uint64_t lpa) {
     }
 }
 
-void DataCache::InsertReadData(const uint32_t stream_id, const uint64_t lpa, const std::vector<uint8_t>& data, const uint64_t timestamp, const uint64_t read_sector_bitmap) {
+void DataCache::InsertReadData(const uint64_t stream_id, const uint64_t lpa, const std::vector<uint8_t>& data, const uint64_t timestamp, const uint64_t read_sector_bitmap) {
     uint64_t key = LPN_TO_UNIQUE_KEY(stream_id, lpa);
     if(slots.find(key) == slots.end()){
         if(slots.size() >= capacity_in_pages){
@@ -109,7 +109,7 @@ void DataCache::InsertReadData(const uint32_t stream_id, const uint64_t lpa, con
     }
 }
 
-void DataCache::InsertWriteData(const uint32_t stream_id, const uint64_t lpa, const std::vector<uint8_t>& data, const uint64_t timestamp, const uint64_t write_sector_bitmap) {
+void DataCache::InsertWriteData(const uint64_t stream_id, const uint64_t lpa, const std::vector<uint8_t>& data, const uint64_t timestamp, const uint64_t write_sector_bitmap) {
     uint64_t key = LPN_TO_UNIQUE_KEY(stream_id, lpa);
     if(slots.find(key) == slots.end()){
         if(slots.size() >= capacity_in_pages){
@@ -128,7 +128,7 @@ void DataCache::InsertWriteData(const uint32_t stream_id, const uint64_t lpa, co
     }
 }
 
-void DataCache::UpdateData(const uint32_t stream_id, const uint64_t lpa, const std::vector<uint8_t>& data, const uint64_t timestamp, const uint64_t write_sector_bitmap) {
+void DataCache::UpdateData(const uint64_t stream_id, const uint64_t lpa, const std::vector<uint8_t>& data, const uint64_t timestamp, const uint64_t write_sector_bitmap) {
     uint64_t key = LPN_TO_UNIQUE_KEY(stream_id, lpa);
     auto it = slots.find(key);
     if (it != slots.end()) {

@@ -12,7 +12,7 @@ public:
 class Block{
 public:
     Block(int block_id, int pages_per_block, int page_size):block_id(block_id), pages(pages_per_block, Page(page_size)){}
-    uint32_t block_id;
+    uint64_t block_id;
     std::vector<Page> pages;
 };
 
@@ -20,11 +20,11 @@ class Plane{
     private:
     double bad_block_ratio = 0.02; // 坏块比例
     void set_random_bad_blocks(){
-        uint32_t bad_block_count = static_cast<uint32_t>(blocks_no * bad_block_ratio);
+        uint64_t bad_block_count = static_cast<uint64_t>(blocks_no * bad_block_ratio);
         if(bad_block_count == 0 && bad_block_ratio > 0) bad_block_count = 2; // 至少2个坏块
-        std::set<uint32_t> bad_blocks_set;
+        std::set<uint64_t> bad_blocks_set;
         std::mt19937 rng{std::random_device{}()};
-        std::uniform_int_distribution<uint32_t> dist(0, blocks_no - 1);
+        std::uniform_int_distribution<uint64_t> dist(0, blocks_no - 1);
         while (bad_blocks_set.size() < bad_block_count) {
             bad_blocks_set.insert(dist(rng));
         }
@@ -36,16 +36,16 @@ public:
     Plane(int blocks_per_plane, int pages_per_block, int page_size)
         : blocks_no(blocks_per_plane), pages_per_block(pages_per_block) {
         blocks.reserve(blocks_no);
-        for (uint32_t i = 0; i < blocks_no; ++i) {
+        for (uint64_t i = 0; i < blocks_no; ++i) {
             blocks.emplace_back(i, pages_per_block, page_size);
         }
         set_random_bad_blocks();
     }
-    uint32_t blocks_no;
-    uint32_t bad_block_no;
-    uint32_t healthy_block_no;
-    uint32_t pages_per_block;
-    std::vector<uint32_t> bad_block_ids;
+    uint64_t blocks_no;
+    uint64_t bad_block_no;
+    uint64_t healthy_block_no;
+    uint64_t pages_per_block;
+    std::vector<uint64_t> bad_block_ids;
     std::vector<Block> blocks;
 };
 
@@ -53,7 +53,7 @@ public:
 class Die{
 public:
     enum class DieStatus { BUSY, IDLE };
-    uint32_t plane_no;
+    uint64_t plane_no;
     DieStatus status;
     std::vector<Plane> planes;
 };
@@ -64,19 +64,19 @@ class NandChip {
         BUSY
     };
         struct Addr {
-        uint32_t die;
-        uint32_t plane;
-        uint32_t block;
-        uint32_t page;
+        uint64_t die;
+        uint64_t plane;
+        uint64_t block;
+        uint64_t page;
     };
 
 public:
-    NandChip(uint32_t channel_id, uint32_t chip_id, uint32_t dies_per_chip, uint32_t planes_per_die,
-             uint32_t blocks_per_plane, uint32_t pages_per_block,uint32_t page_size);
+    NandChip(uint64_t channel_id, uint64_t chip_id, uint64_t dies_per_chip, uint64_t planes_per_die,
+             uint64_t blocks_per_plane, uint64_t pages_per_block,uint64_t page_size);
     ~NandChip();
-    uint32_t channel_id;
-    uint32_t chip_id;
-    std::vector<uint8_t> GetMetaData(uint32_t die, uint32_t plane, uint32_t block, uint32_t page);
+    uint64_t channel_id;
+    uint64_t chip_id;
+    std::vector<uint8_t> GetMetaData(uint64_t die, uint64_t plane, uint64_t block, uint64_t page);
     int erase_block(const Addr *addr);
     int write_page(const Addr *addr, const uint8_t *data);
     int read_page(const Addr *addr, uint8_t *data);

@@ -2,7 +2,7 @@
 #include "transaction.h"
 #include "gc_wl.h"
 
-uint32_t BlockSlot::page_bitmap_size = 0;
+uint64_t BlockSlot::page_bitmap_size = 0;
 
 void BlockSlot::Erase()
 {
@@ -18,7 +18,7 @@ void BlockSlot::Erase()
     }
 }
 
-BlockPtr PlaneBookKeeping::GetOneFreeBlock(uint32_t stream_id, bool for_mapping_data)
+BlockPtr PlaneBookKeeping::GetOneFreeBlock(uint64_t stream_id, bool for_mapping_data)
 {
     if (free_block_pool.empty())
     {
@@ -32,7 +32,7 @@ BlockPtr PlaneBookKeeping::GetOneFreeBlock(uint32_t stream_id, bool for_mapping_
     return block;
 }
 
-void PlaneBookKeeping::CheckBookKeepingCorrectness(PhysicalPageAddress &plane_address)
+void PlaneBookKeeping::CheckBookKeepingCorrectness(const PhysicalPageAddress &plane_address)
 {
     int all_pages_cnt = free_pages_count + valid_pages_count + invalid_pages_count;
     if (all_pages_cnt != total_pages_count)
@@ -57,10 +57,10 @@ void PlaneBookKeeping::AddToFreeBlockPool(BlockPtr block, bool consider_dynamic_
     }
 }
 
-BlockManager::BlockManager(GcWlUnitPtr gc_ptr, uint32_t block_pe_cycle,
-                           uint32_t total_stream_count, uint32_t total_channel_count, uint32_t chips_per_channel,
-                           uint32_t dies_per_chip, uint32_t planes_per_die, uint32_t blocks_per_plane,
-                           uint32_t pages_per_block)
+BlockManager::BlockManager(GcWlUnitPtr gc_ptr, uint64_t block_pe_cycle,
+                           uint64_t total_stream_count, uint64_t total_channel_count, uint64_t chips_per_channel,
+                           uint64_t dies_per_chip, uint64_t planes_per_die, uint64_t blocks_per_plane,
+                           uint64_t pages_per_block)
     : gc_unit(gc_ptr), block_pe_cycle(block_pe_cycle), total_stream_count(total_stream_count),
       total_channel_count(total_channel_count), chips_per_channel(chips_per_channel),
       dies_per_chip(dies_per_chip), planes_per_die(planes_per_die),
@@ -131,11 +131,7 @@ BlockManager::BlockManager(GcWlUnitPtr gc_ptr, uint32_t block_pe_cycle,
     }
 }
 
-BlockManager::~BlockManager()
-{
-}
-
-void BlockManager::AllocateBlockAndPageInPlaneForUserWrite(const uint32_t stream_id, PhysicalPageAddress &page_address)
+void BlockManager::AllocateBlockAndPageInPlaneForUserWrite(const uint64_t stream_id, PhysicalPageAddress &page_address)
 {
     auto plane = GetPlaneBookKeepingEntry(page_address);
     plane->valid_pages_count++;
@@ -153,36 +149,102 @@ void BlockManager::AllocateBlockAndPageInPlaneForUserWrite(const uint32_t stream
     plane->CheckBookKeepingCorrectness(page_address);
 }
 
-void BlockManager::AllocateBlockAndPageInPlaneForGcWrite(const uint32_t stream_id, PhysicalPageAddress &page_address, bool for_mapping_data)
+void BlockManager::AllocateBlockAndPageInPlaneForGcWrite(const uint64_t stream_id, PhysicalPageAddress &page_address, bool for_mapping_data)
 {
+    auto plane = GetPlaneBookKeepingEntry(page_address);
+    plane->valid_pages_count++;
+    plane->free_pages_count--;
+    page_address.block_id = plane->gc_open_blocks[stream_id]->block_id;
+    page_address.page_id = plane->gc_open_blocks[stream_id]->current_write_page_index++;
+    if (plane->gc_open_blocks[stream_id]->current_write_page_index == pages_per_block)
+    {
+        // 当前块写满，分配新块
+        plane->gc_open_blocks[stream_id] = plane->GetOneFreeBlock(stream_id, for_mapping_data);
+        gc_unit->CheckGcRequired(plane->GetFreeBlockCount(), page_address);
+    }
+    plane->CheckBookKeepingCorrectness(page_address);
 }
 
-void BlockManager::AllocateBlockAndPageInPlaneForTranslationGcWrite(const uint32_t stream_id, PhysicalPageAddress &page_address)
+void BlockManager::AllocateBlockAndPageInPlaneForTranslationGcWrite(const uint64_t stream_id, PhysicalPageAddress &page_address)
 {
+    auto plane = GetPlaneBookKeepingEntry(page_address);
+    plane->valid_pages_count++;
+    plane->free_pages_count--;
+    page_address.block_id = plane->translation_open_blocks[stream_id]->block_id;
+    page_address.page_id = plane->translation_open_blocks[stream_id]->current_write_page_index++;
+    if (plane->translation_open_blocks[stream_id]->current_write_page_index == pages_per_block)
+    {
+        // 当前块写满，分配新块
+        plane->translation_open_blocks[stream_id] = plane->GetOneFreeBlock(stream_id, true);
+        gc_unit->CheckGcRequired(plane->GetFreeBlockCount(), page_address);
+    }
+    plane->CheckBookKeepingCorrectness(page_address);
 }
 
-void BlockManager::InvalidatePageInBlock(const uint32_t stream_id, const PhysicalPageAddress &page_address)
+void BlockManager::InvalidatePageInBlock(const uint64_t stream_id, const PhysicalPageAddress &page_address)
 {
+    auto plane = GetPlaneBookKeepingEntry(page_address);
+    plane->valid_pages_count--;
+    plane->invalid_pages_count++;
+    if(plane->blocks[page_address.block_id]->stream_id != stream_id)
+    {
+        PRINT_ERROR("Inconsistent status in the Invalidate_page_in_block function! The accessed block is not allocated to stream " << stream_id)
+    }
+    plane->blocks[page_address.block_id]->invalid_page_count++;
+    plane->blocks[page_address.block_id]->invalid_page_bitmap[page_address.page_id / 64] |= (1ULL << (page_address.page_id % 64));
 }
 
 void BlockManager::AddErasedBlockToPool(const PhysicalPageAddress &block_address)
 {
+    auto plane = GetPlaneBookKeepingEntry(block_address);
+    auto block = plane->blocks[block_address.block_id];
+    plane->free_pages_count += (pages_per_block - block->invalid_page_count);
+    plane->invalid_pages_count -= block->invalid_page_count;
+
+    block->Erase();
+    plane->AddToFreeBlockPool(block, gc_unit->UseDynamicWearLeveling());
+    plane->CheckBookKeepingCorrectness(block_address);
 }
 
-uint32_t BlockManager::GetFreeBlockPoolSize(const PhysicalPageAddress &plane_address)
+uint64_t BlockManager::GetFreeBlockPoolSize(const PhysicalPageAddress &plane_address)
 {
     auto plane = GetPlaneBookKeepingEntry(plane_address);
     return plane->free_block_pool.size();
 }
 
-uint32_t BlockManager::GetColdestBlockId(const PhysicalPageAddress &plane_address)
+uint64_t BlockManager::GetColdestBlockId(const PhysicalPageAddress &plane_address)
 {
-    return 0;
+    uint64_t coldest_block_id = 0;
+    auto plane = GetPlaneBookKeepingEntry(plane_address);
+    uint64_t min_erase_count = std::numeric_limits<uint64_t>::max();
+    for (const auto& block : plane->blocks)
+    {
+        if (block->erase_count < min_erase_count)
+        {
+            min_erase_count = block->erase_count;
+            coldest_block_id = block->block_id;
+        }
+    }
+    return coldest_block_id;
 }
 
-uint32_t BlockManager::GetMinMaxEraseDifference(const PhysicalPageAddress &plane_address)
+uint64_t BlockManager::GetMinMaxEraseDifference(const PhysicalPageAddress &plane_address)
 {
-    return 0;
+    auto plane = GetPlaneBookKeepingEntry(plane_address);
+    uint64_t min_erase_count = std::numeric_limits<uint64_t>::max();
+    uint64_t max_erase_count = 0;
+    for (const auto& block : plane->blocks)
+    {
+        if (block->erase_count < min_erase_count)
+        {
+            min_erase_count = block->erase_count;
+        }
+        if (block->erase_count > max_erase_count)
+        {
+            max_erase_count = block->erase_count;
+        }
+    }
+    return max_erase_count - min_erase_count;
 }
 
 PlaneBookKeepingPtr BlockManager::GetPlaneBookKeepingEntry(const PhysicalPageAddress &plane_address)
@@ -192,48 +254,69 @@ PlaneBookKeepingPtr BlockManager::GetPlaneBookKeepingEntry(const PhysicalPageAdd
 
 bool BlockManager::BlockHasOngoingGC(const PhysicalPageAddress &block_address)
 {
-    return false;
+    auto plane = GetPlaneBookKeepingEntry(block_address);
+    auto block = plane->blocks[block_address.block_id];
+    return block->has_ongoing_gc;
 }
 
 bool BlockManager::CanExecGC(const PhysicalPageAddress &block_address)
 {
-    return false;
+    auto plane_record = GetPlaneBookKeepingEntry(block_address);
+    auto block = plane_record->blocks[block_address.block_id];
+    return (block->ongoing_user_program_cnt + block->ongoing_user_read_cnt == 0);
 }
 
 void BlockManager::GcStartedOnBlock(const PhysicalPageAddress &block_address)
 {
+    auto plane = GetPlaneBookKeepingEntry(block_address);
+    plane->blocks[block_address.block_id]->has_ongoing_gc = true;
 }
 
 void BlockManager::GcFinishedOnBlock(const PhysicalPageAddress &block_address)
 {
+    auto plane = GetPlaneBookKeepingEntry(block_address);
+    plane->blocks[block_address.block_id]->has_ongoing_gc = false;
 }
 
 void BlockManager::ReadTransactionStartedOnBlock(const PhysicalPageAddress &block_address)
 {
+    auto plane = GetPlaneBookKeepingEntry(block_address);
+    plane->blocks[block_address.block_id]->ongoing_user_read_cnt++;
 }
 
 void BlockManager::ReadTransactionFinishedOnBlock(const PhysicalPageAddress &block_address)
 {
+    auto plane = GetPlaneBookKeepingEntry(block_address);
+    plane->blocks[block_address.block_id]->ongoing_user_read_cnt--;
 }
 
 void BlockManager::ProgramTransactionStartedOnBlock(const PhysicalPageAddress &block_address)
 {
+    auto plane = GetPlaneBookKeepingEntry(block_address);
+    plane->blocks[block_address.block_id]->ongoing_user_program_cnt++;
 }
 
 void BlockManager::ProgramTransactionFinishedOnBlock(const PhysicalPageAddress &block_address)
 {
+    auto plane = GetPlaneBookKeepingEntry(block_address);
+    plane->blocks[block_address.block_id]->ongoing_user_program_cnt--;
 }
 
-bool BlockManager::IsHavingOngoingProgramOnBlock(const PhysicalPageAddress &block_address) const
+bool BlockManager::IsHavingOngoingProgramOnBlock(const PhysicalPageAddress &block_address)
 {
-    return false;
+    auto plane = GetPlaneBookKeepingEntry(block_address);
+    return plane->blocks[block_address.block_id]->ongoing_user_program_cnt > 0;
 }
 
 bool BlockManager::IsPageValid(const PhysicalPageAddress &page_address)
 {
-    return false;
+    auto plane = GetPlaneBookKeepingEntry(page_address);
+    auto block = plane->blocks[page_address.block_id];
+    return (block->invalid_page_bitmap[page_address.page_id / 64] & (1ULL << (page_address.page_id % 64))) == 0;
 }
 
 void BlockManager::ProgramTransactionIssued(PhysicalPageAddress &page_address)
 {
+    auto plane = GetPlaneBookKeepingEntry(page_address);
+    plane->blocks[page_address.block_id]->ongoing_user_program_cnt++;
 }

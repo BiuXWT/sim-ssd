@@ -22,6 +22,8 @@
 						 }
 #define PRINT_MESSAGE(M) std::cout << M << std::endl;
 
+#define LPN_TO_UNIQUE_KEY(STREAM,LPA) ((((uint64_t)STREAM)<<56)|LPA)
+#define UNIQUE_KEY_TO_LPN(STREAM,LPA) ((~(((uint64_t)STREAM)<<56))&LPA)
 
 enum class MAPPING_MODE
 {
@@ -85,10 +87,10 @@ enum class UserRequestType
 struct CacheParam
 {
     CACHE_MODE mode;
-    uint32_t cache_size; // in MB
-    uint32_t CMT_size; // in MB
-    uint32_t Read_cache_size; // in MB
-    uint32_t Write_cache_size; // in MB
+    uint64_t cache_size; // in MB
+    uint64_t CMT_size; // in MB
+    uint64_t Read_cache_size; // in MB
+    uint64_t Write_cache_size; // in MB
 };
 
 struct GcParam
@@ -101,7 +103,7 @@ struct GcParam
 struct SlcCacheParam
 {
     SLC_CACHE_MODE mode=SLC_CACHE_MODE::SLC_CACHE_MODE_DYNAMIC;
-    uint32_t slc_static_size=128; // in blocks
+    uint64_t slc_static_size=128; // in blocks
     double slc_dynamic_ratio=0.3; // in percentage
 };
 
@@ -110,17 +112,17 @@ struct SSDParam{
     GcParam gc_param;
     SlcCacheParam slc_cache_param;
     MAPPING_MODE mapping_mode=MAPPING_MODE::MAPPING_MODE_PAGE_LEVEL;
-    uint32_t ChannelNum=2;
-    uint32_t ChipPerChannel=2;
+    uint64_t ChannelNum=2;
+    uint64_t ChipPerChannel=2;
 };
 
 struct NandParam{
-    uint32_t DiePerChip=2;
-    uint32_t PlanePerDie=2;
-    uint32_t BlockPerPlane=64;
-    uint32_t PagePerBlock=8;
-    uint32_t PageSize=16384;
-    uint32_t SpareSize=2208;
+    uint64_t DiePerChip=2;
+    uint64_t PlanePerDie=2;
+    uint64_t BlockPerPlane=64;
+    uint64_t PagePerBlock=8;
+    uint64_t PageSize=16384;
+    uint64_t SpareSize=2208;
 };
 
 struct Config{
@@ -140,6 +142,8 @@ class NandDriver;
 class NandChip;
 class PhysicalPageAddress;
 class GcWlUnit;
+class CMTSlot;
+
 
 using UserRequestPtr = std::shared_ptr<UserRequest>;
 using AddressMappingPtr = std::shared_ptr<AddressMapping>;
@@ -151,3 +155,4 @@ using NandChipPtr = std::shared_ptr<NandChip>;
 using PhysicalPageAddressPtr = std::shared_ptr<PhysicalPageAddress>;
 using GcWlUnitPtr = std::shared_ptr<GcWlUnit>;
 using TransactionErasePtr = std::shared_ptr<TransactionErase>;
+using CMTSlotPtr = std::shared_ptr<CMTSlot>;
