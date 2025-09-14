@@ -34,7 +34,7 @@ BlockPtr PlaneBookKeeping::GetOneFreeBlock(uint64_t stream_id, bool for_mapping_
 
 void PlaneBookKeeping::CheckBookKeepingCorrectness(const PhysicalPageAddress &plane_address)
 {
-    int all_pages_cnt = free_pages_count + valid_pages_count + invalid_pages_count;
+    uint64_t all_pages_cnt = free_pages_count + valid_pages_count + invalid_pages_count;
     if (all_pages_cnt != total_pages_count)
     {
         PRINT_ERROR("Inconsistent status in the plane bookkeeping record!")
@@ -87,7 +87,7 @@ BlockManager::BlockManager(GcWlUnitPtr gc_ptr, uint64_t block_pe_cycle,
                     plane->ongoing_erase_blocks.clear();
                     plane->blocks.resize(blocks_per_plane);
 
-                    for(size_t block_id = 0; block_id < blocks_per_plane; block_id++)
+                    for (size_t block_id = 0; block_id < blocks_per_plane; block_id++)
                     {
                         plane->blocks[block_id] = std::make_shared<BlockSlot>();
                         auto block = plane->blocks[block_id];
@@ -108,7 +108,7 @@ BlockManager::BlockManager(GcWlUnitPtr gc_ptr, uint64_t block_pe_cycle,
                         // 1. 一个uint64_t有64位，可以表示64个页的状态
                         // 2. pages_per_block/(8*sizeof(uint64_t)) 计算能被完整uint64_t覆盖的页组数
                         // 3. pages_per_block%(8*sizeof(uint64_t))?1:0 判断是否有剩余页，若有则再多分配一个uint64_t
-                        BlockSlot::page_bitmap_size = pages_per_block/(8*sizeof(uint64_t))+(pages_per_block%(8*sizeof(uint64_t))?1:0);
+                        BlockSlot::page_bitmap_size = pages_per_block / (8 * sizeof(uint64_t)) + (pages_per_block % (8 * sizeof(uint64_t)) ? 1 : 0);
                         block->invalid_page_bitmap.resize(BlockSlot::page_bitmap_size);
                         for (size_t i = 0; i < BlockSlot::page_bitmap_size; i++)
                         {
@@ -140,7 +140,7 @@ void BlockManager::AllocateBlockAndPageInPlaneForUserWrite(const uint64_t stream
     page_address.page_id = plane->data_open_blocks[stream_id]->current_write_page_index++;
     ProgramTransactionIssued(page_address);
 
-    if(plane->data_open_blocks[stream_id]->current_write_page_index == pages_per_block)
+    if (plane->data_open_blocks[stream_id]->current_write_page_index == pages_per_block)
     {
         // 当前块写满，分配新块
         plane->data_open_blocks[stream_id] = plane->GetOneFreeBlock(stream_id, false);
@@ -186,7 +186,7 @@ void BlockManager::InvalidatePageInBlock(const uint64_t stream_id, const Physica
     auto plane = GetPlaneBookKeepingEntry(page_address);
     plane->valid_pages_count--;
     plane->invalid_pages_count++;
-    if(plane->blocks[page_address.block_id]->stream_id != stream_id)
+    if (plane->blocks[page_address.block_id]->stream_id != stream_id)
     {
         PRINT_ERROR("Inconsistent status in the Invalidate_page_in_block function! The accessed block is not allocated to stream " << stream_id)
     }
@@ -217,7 +217,7 @@ uint64_t BlockManager::GetColdestBlockId(const PhysicalPageAddress &plane_addres
     uint64_t coldest_block_id = 0;
     auto plane = GetPlaneBookKeepingEntry(plane_address);
     uint64_t min_erase_count = std::numeric_limits<uint64_t>::max();
-    for (const auto& block : plane->blocks)
+    for (const auto &block : plane->blocks)
     {
         if (block->erase_count < min_erase_count)
         {
@@ -233,7 +233,7 @@ uint64_t BlockManager::GetMinMaxEraseDifference(const PhysicalPageAddress &plane
     auto plane = GetPlaneBookKeepingEntry(plane_address);
     uint64_t min_erase_count = std::numeric_limits<uint64_t>::max();
     uint64_t max_erase_count = 0;
-    for (const auto& block : plane->blocks)
+    for (const auto &block : plane->blocks)
     {
         if (block->erase_count < min_erase_count)
         {

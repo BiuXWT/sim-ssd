@@ -8,11 +8,11 @@ int GcWlUnit::GetRandomBlockId()
     return dist(rng);
 }
 
-GcWlUnit::GcWlUnit(AddressMappingPtr amu, BlockManagerPtr bmu, NandDriverPtr nd, GC_POLICY gc_policy, 
-    double gc_threshold, bool preemptible_gc_enabled, double gc_hard_threshold, uint64_t channel_count, 
-    uint64_t chip_per_channel, uint64_t die_per_chip, uint64_t plane_per_die, uint64_t block_per_plane, 
-    uint64_t page_per_block, uint64_t sectors_per_page, bool use_copyback, double rho, 
-    uint64_t max_ongoing_gc_reqs_per_plane, bool dynamic_wl_enabled, bool static_wl_enabled, uint64_t static_wl_threshold)
+GcWlUnit::GcWlUnit(AddressMappingPtr amu, BlockManagerPtr bmu, NandDriverPtr nd, GC_POLICY gc_policy,
+                   double gc_threshold, bool preemptible_gc_enabled, double gc_hard_threshold, uint64_t channel_count,
+                   uint64_t chip_per_channel, uint64_t die_per_chip, uint64_t plane_per_die, uint64_t block_per_plane,
+                   uint64_t page_per_block, uint64_t sectors_per_page, bool use_copyback, double rho,
+                   uint64_t max_ongoing_gc_reqs_per_plane, bool dynamic_wl_enabled, bool static_wl_enabled, uint64_t static_wl_threshold)
     : gc_policy(gc_policy), address_mapping(amu), block_manager(bmu), nand_driver(nd),
       use_copyback(use_copyback), preemptible_gc_enabled(preemptible_gc_enabled), gc_hard_threshold(gc_hard_threshold),
       max_ongoing_gc_reqs_per_plane(max_ongoing_gc_reqs_per_plane), dynamic_wl_enabled(dynamic_wl_enabled),
@@ -125,7 +125,7 @@ void GcWlUnit::CheckGcRequired(const uint64_t free_block_pool_size, const Physic
             gc_candidate_block_id = GetRandomBlockId();
             uint64_t repeat = 0;
 
-            while (plane->blocks[gc_candidate_block_id]->current_write_page_index < page_per_block || plane->blocks[gc_candidate_block_id]->invalid_page_count < random_pp_threshold || !IsSafeGcCandidate(plane, gc_candidate_block_id) && repeat++ < block_per_plane)
+            while (plane->blocks[gc_candidate_block_id]->current_write_page_index < page_per_block || plane->blocks[gc_candidate_block_id]->invalid_page_count < random_pp_threshold || (!IsSafeGcCandidate(plane, gc_candidate_block_id) && repeat++ < block_per_plane))
             {
                 gc_candidate_block_id = GetRandomBlockId();
             }
