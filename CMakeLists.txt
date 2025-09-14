@@ -1,0 +1,33 @@
+cmake_minimum_required(VERSION 3.10)
+project(nand_model)
+
+set(CMAKE_CXX_STANDARD 17)
+add_compile_options(-Wall -Wextra -Werror)
+
+# 查找所有子目录下的源文件
+file(GLOB_RECURSE SOURCES
+    "*.cpp"
+    "address_mapping/*.cpp"
+    "block_manager/*.cpp"
+    "cache_manager/*.cpp"
+    "garbage_collection/*.cpp"
+    "nand_drive/*.cpp"
+    "nand_runtime/*.cpp"
+)
+# 排除CMake生成目录下的所有cpp文件
+list(FILTER SOURCES EXCLUDE REGEX ".*/build/.*")
+list(FILTER SOURCES EXCLUDE REGEX ".*/CMakeFiles/.*")
+# 包含头文件目录
+include_directories(
+    ./
+    ${PROJECT_SOURCE_DIR}/transaction
+    ${PROJECT_SOURCE_DIR}/gc_wl
+    ${PROJECT_SOURCE_DIR}/nand_chip
+    ${PROJECT_SOURCE_DIR}/nand_driver
+    ${PROJECT_SOURCE_DIR}/address_mapping
+    ${PROJECT_SOURCE_DIR}/block_manager
+    ${PROJECT_SOURCE_DIR}/cache_manager
+)
+
+# 创建可执行文件
+add_executable(nand_model ${SOURCES})
