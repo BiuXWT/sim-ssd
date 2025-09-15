@@ -5,19 +5,19 @@
 •	GREEDY：效率优先，磨损不均。
 •	RGA：兼顾效率和均衡。
 •	RANDOM/RANDOM_P/RANDOM_PP：均衡优先，效率较低。
-•	FIFO：顺序回收，简单易实现。 
+•	FIFO：顺序回收，简单易实现。
 */
 
 class GcWlUnit
 {
 public:
-    GcWlUnit(AddressMappingPtr amu, BlockManagerPtr bmu, NandDriverPtr nd,
-            GC_POLICY gc_policy, double gc_threshold,bool preemptible_gc_enabled,double gc_hard_threshold,
-            uint64_t channel_count,uint64_t chip_per_channel,uint64_t die_per_chip,
-            uint64_t plane_per_die,uint64_t block_per_plane,uint64_t page_per_block,uint64_t sectors_per_page,
-            bool use_copyback,double rho,uint64_t max_on_going_gc_reqs_per_plane,
-            bool dynamic_wl_enabled,bool static_wl_enabled,uint64_t static_wl_threshold);
-    ~GcWlUnit()=default;
+    GcWlUnit(AddressMappingPageLevelPtr amu, BlockManagerPtr bmu, NandDriverPtr nd,
+             GC_POLICY gc_policy, double gc_threshold, bool preemptible_gc_enabled, double gc_hard_threshold,
+             uint64_t channel_count, uint64_t chip_per_channel, uint64_t die_per_chip,
+             uint64_t plane_per_die, uint64_t block_per_plane, uint64_t page_per_block, uint64_t sectors_per_page,
+             bool use_copyback, double rho, uint64_t max_on_going_gc_reqs_per_plane,
+             bool dynamic_wl_enabled, bool static_wl_enabled, uint64_t static_wl_threshold);
+    ~GcWlUnit() = default;
 
     bool GcIsUrgentMode(NandChipPtr chip);
     void CheckGcRequired(const uint64_t free_block_pool_size, const PhysicalPageAddress &plane_address);
@@ -31,7 +31,7 @@ public:
 
 private:
     GC_POLICY gc_policy;
-    AddressMappingPtr address_mapping;
+    AddressMappingPageLevelPtr address_mapping;
     BlockManagerPtr block_manager;
     NandDriverPtr nand_driver;
 

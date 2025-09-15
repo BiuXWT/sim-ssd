@@ -64,7 +64,7 @@ void NandDrive::print_page(const Addr *addr)
     if (!addr)
         return;
     uint8_t *ptr = page_ptr(buffer, addr);
-    std::printf("Die %llu Plane %llu Block %llu Page %llu Main: ", addr->die, addr->plane, addr->block, addr->page);
+    std::printf("Die %lu Plane %lu Block %lu Page %lu Main: ", addr->die, addr->plane, addr->block, addr->page);
     for (uint64_t i = 0; i < 16 && i < PG_SZ; i++)
         std::printf("%02X ", ptr[i]);
     std::printf("\n");

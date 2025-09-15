@@ -8,7 +8,7 @@ int GcWlUnit::GetRandomBlockId()
     return dist(rng);
 }
 
-GcWlUnit::GcWlUnit(AddressMappingPtr amu, BlockManagerPtr bmu, NandDriverPtr nd, GC_POLICY gc_policy,
+GcWlUnit::GcWlUnit(AddressMappingPageLevelPtr amu, BlockManagerPtr bmu, NandDriverPtr nd, GC_POLICY gc_policy,
                    double gc_threshold, bool preemptible_gc_enabled, double gc_hard_threshold, uint64_t channel_count,
                    uint64_t chip_per_channel, uint64_t die_per_chip, uint64_t plane_per_die, uint64_t block_per_plane,
                    uint64_t page_per_block, uint64_t sectors_per_page, bool use_copyback, double rho,

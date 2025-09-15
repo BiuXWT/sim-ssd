@@ -24,7 +24,7 @@ class CachedMappingTable
 {
 public:
     CachedMappingTable(uint64_t capacity) : capacity_in_entries(capacity) {}
-    ~CachedMappingTable();
+    ~CachedMappingTable() = default;
     bool Exists(const uint64_t stream_id, const uint64_t lpa);
     // 获取 LPA 对应的 PPA;Retrieve:检索
     uint64_t RetrievePPA(const uint64_t stream_id, const uint64_t lpa);
@@ -65,14 +65,14 @@ public:
     std::multimap<uint64_t, TransactionPtr> read_transactions_behind_LPA_barrier;    // key: LPA, value: tr_ptr
     std::multimap<uint64_t, TransactionPtr> program_transactions_behind_LPA_barrier; // key: LPA, value: tr_ptr
 
-    std::shared_ptr<uint64_t[]> channel_ids;
     uint64_t channel_no;
-    std::shared_ptr<uint64_t[]> chip_ids;
     uint64_t chip_no;
-    std::shared_ptr<uint64_t[]> die_ids;
     uint64_t die_no;
-    std::shared_ptr<uint64_t[]> plane_ids;
     uint64_t plane_no;
+    std::shared_ptr<uint64_t[]> channel_ids;
+    std::shared_ptr<uint64_t[]> chip_ids;
+    std::shared_ptr<uint64_t[]> die_ids;
+    std::shared_ptr<uint64_t[]> plane_ids;
 
     uint64_t max_logical_sector_address;
     uint64_t total_logical_page_no;
@@ -84,13 +84,34 @@ class AddressMappingPageLevel
 public:
     AddressMappingPageLevel();
     ~AddressMappingPageLevel() = default;
+    uint64_t GetCMTCapacity();
+    uint64_t GetLogicalPagesNo();
+    uint64_t GetStreamsNo();
+
+    void TranslateLpaToPpaAndDispatch(std::list<TransactionPtr> &tr);
+    void GetDataMappingForGC(uint64_t stream_id, uint64_t lpa, uint64_t &ppa, uint64_t &write_state_bitmap);
+    void AllocateNewPageForGC(TransactionPtr tr);
+    uint64_t GetDevicePhysicalPagesCount();
+    uint64_t GetDeviceLogicalPagesCount();
+    CMTSharingMode GetCMTSharingMode() const { return sharing_mode; }
+    PhysicalPageAddressPtr ConvertPPAtoAddress(const uint64_t ppa);
+    void ConvertPPAtoAddress(const uint64_t ppa, PhysicalPageAddressPtr &address);
+    uint64_t ConvertAddresstoPPA(const PhysicalPageAddressPtr address);
+
+    void SetBarrierForPhysicalBlock(const PhysicalPageAddressPtr address);
+    void SetBarrierForLPA(const uint64_t stream_id, const uint64_t lpa);
+    void RemoveBarrierForLPA(const uint64_t stream_id, const uint64_t lpa);
+    void StartServicingWritesForOverfullPlane(const PhysicalPageAddressPtr plane_address);
 
 private:
     FTLPtr ftl;
     BlockManagerPtr block_manager;
+    std::vector<AddressMappingDomainPtr> domain;
     CMTSharingMode sharing_mode;
     uint64_t total_stream_count;
     uint64_t max_logical_sector_address;
+
+    uint64_t cmt_capacity_in_entries;
 
     uint64_t channel_no;
     uint64_t chips_per_channel;
@@ -108,6 +129,17 @@ private:
     uint64_t pages_per_chip;
     uint64_t pages_per_die;
     uint64_t pages_per_plane;
+    std::unique_ptr<std::set<TransactionPtr> ***[]> Write_transactions_for_overfull_planes;
 
     double overprovisioning_ratio;
+
+    void AllocatePlaneForUserWrite(TransactionPtr tr);
+    void AllocatePageInPlaneForUserWrite(TransactionPtr tr, bool is_for_gc);
+    bool TranslateLpaToPpa(uint64_t stream_id, TransactionPtr tr);
+
+    bool QueryCMT(TransactionPtr tr);
+    uint64_t OnlineCreateEntryForRead(uint64_t stream_id, uint64_t lpa, PhysicalPageAddressPtr addr, uint64_t read_sectors_bitmap);
+    void ManageUserTransactionFacingBarrier(TransactionPtr tr);
+    bool IsLPALockedForGC(const uint64_t stream_id, const uint64_t lpa);
+
 };
