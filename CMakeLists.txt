@@ -11,7 +11,7 @@ file(GLOB_RECURSE SOURCES
     "block_manager/*.cpp"
     "cache_manager/*.cpp"
     "garbage_collection/*.cpp"
-    "nand_drive/*.cpp"
+    "nand_driver/*.cpp"
     "nand_runtime/*.cpp"
 )
 # 排除CMake生成目录下的所有cpp文件

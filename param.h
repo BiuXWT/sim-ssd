@@ -13,6 +13,9 @@
 #include <cassert>
 #include <random>
 #include <algorithm>
+#include <mutex>
+#include <future>
+#include <condition_variable>
 
 #define PRINT_ERROR(MSG)               \
     {                                  \
@@ -21,6 +24,9 @@
         std::cin.get();                \
         exit(1);                       \
     }
+
+#define NO_VALUE 0xffffffffffffffffULL
+
 #define PRINT_MESSAGE(M) std::cout << M << std::endl;
 
 #define LPN_TO_UNIQUE_KEY(STREAM, LPA) ((((uint64_t)STREAM) << 56) | LPA)

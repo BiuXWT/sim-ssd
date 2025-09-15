@@ -1,4 +1,6 @@
 #include "address_mapping.h"
+#include "transaction.h"
+#include "block_manager.h"
 
 bool CachedMappingTable::Exists(uint64_t stream_id, uint64_t lpa)
 {
@@ -138,6 +140,8 @@ void CachedMappingTable::MakeClean(const uint64_t stream_id, const uint64_t lpa)
     it->second->dirty = false;
 }
 
+//============================================== AddressMappingDomain ==============================================
+
 AddressMappingDomain::AddressMappingDomain(CachedMappingTablePtr cmt_ptr, uint64_t *channel_ids_, uint64_t channel_no, uint64_t *chip_ids_,
                                            uint64_t chip_no, uint64_t *die_ids_, uint64_t die_no, uint64_t *plane_ids_, uint64_t plane_no,
                                            uint64_t total_physical_sector_no, uint64_t total_logical_sector_no, uint64_t sectors_per_page)
@@ -193,4 +197,127 @@ uint64_t AddressMappingDomain::GetPPA(const uint64_t stream_id, const uint64_t l
 bool AddressMappingDomain::Mapping_entry_accessible(const uint64_t stream_id, const uint64_t lpa)
 {
     return cmt->Exists(stream_id, lpa);
+}
+
+//============================================== AddressMappingPageLevel ==============================================
+
+uint64_t AddressMappingPageLevel::GetCMTCapacity()
+{
+    return cmt_capacity_in_entries;
+}
+
+uint64_t AddressMappingPageLevel::GetLogicalPagesNo(uint64_t stream_id)
+{
+    return domains[stream_id]->total_logical_page_no;
+}
+
+void AddressMappingPageLevel::GetDataMappingForGC(uint64_t stream_id, uint64_t lpa, uint64_t &ppa, uint64_t &write_state_bitmap)
+{
+    if (domains[stream_id]->Mapping_entry_accessible(stream_id, lpa))
+    {
+        ppa = domains[stream_id]->GetPPA(stream_id, lpa);
+        write_state_bitmap = domains[stream_id]->GetPageStatus(stream_id, lpa);
+    }
+    else
+    {
+        PRINT_ERROR("Mapping entry not found in CMT during GC!")
+    }
+}
+
+void AddressMappingPageLevel::AllocateNewPageForGC(TransactionWritePtr tr)
+{
+    AllocatePageInPlaneForGCWrite(tr);
+    tr->physical_address_determined = true;
+}
+
+PhysicalPageAddressPtr AddressMappingPageLevel::ConvertPPAtoAddress(const uint64_t ppa)
+{
+    // Ensure pages_per_channel and related variables are initialized before use
+    if (pages_per_channel == 0 || pages_per_chip == 0 || pages_per_die == 0 || pages_per_plane == 0 || pages_per_block == 0)
+    {
+        throw std::logic_error("One or more page mapping variables are not initialized!");
+    }
+    PhysicalPageAddressPtr target = std::make_shared<PhysicalPageAddress>();
+    target->channel_id = ppa / pages_per_channel;
+    target->chip_id = (ppa % pages_per_channel) / pages_per_chip;
+    target->die_id = ((ppa % pages_per_channel) % pages_per_chip) / pages_per_die;
+    target->plane_id = (((ppa % pages_per_channel) % pages_per_chip) % pages_per_die) / pages_per_plane;
+    target->block_id = ((((ppa % pages_per_channel) % pages_per_chip) % pages_per_die) % pages_per_plane) / pages_per_block;
+    target->page_id = (((((ppa % pages_per_channel) % pages_per_chip) % pages_per_die) % pages_per_plane) % pages_per_block);
+
+    return target;
+}
+
+void AddressMappingPageLevel::ConvertPPAtoAddress(const uint64_t ppa, PhysicalPageAddressPtr address)
+{
+    if (pages_per_channel == 0 || pages_per_chip == 0 || pages_per_die == 0 || pages_per_plane == 0 || pages_per_block == 0)
+    {
+        throw std::logic_error("One or more page mapping variables are not initialized!");
+    }
+    address->channel_id = ppa / pages_per_channel;
+    address->chip_id = (ppa % pages_per_channel) / pages_per_chip;
+    address->die_id = ((ppa % pages_per_channel) % pages_per_chip) / pages_per_die;
+    address->plane_id = (((ppa % pages_per_channel) % pages_per_chip) % pages_per_die) / pages_per_plane;
+    address->block_id = ((((ppa % pages_per_channel) % pages_per_chip) % pages_per_die) % pages_per_plane) / pages_per_block;
+    address->page_id = (((((ppa % pages_per_channel) % pages_per_chip) % pages_per_die) % pages_per_plane) % pages_per_block);
+}
+
+void AddressMappingPageLevel::AllocatePlaneForUserWrite(TransactionWritePtr tr)
+{
+    uint64_t lpa = tr->lpa;
+    PhysicalPageAddressPtr targetAddress = tr->physical_address;
+    // 实现 LPA 在所有 plane 间的均匀分布。
+    targetAddress->channel_id = domains[tr->stream_id]->channel_ids[lpa % domains[tr->stream_id]->channel_no];
+    targetAddress->chip_id = domains[tr->stream_id]->chip_ids[(lpa / domains[tr->stream_id]->channel_no) % domains[tr->stream_id]->chip_no];
+    targetAddress->die_id = domains[tr->stream_id]->die_ids[(lpa / (domains[tr->stream_id]->channel_no * domains[tr->stream_id]->chip_no)) % domains[tr->stream_id]->die_no];
+    targetAddress->plane_id = domains[tr->stream_id]->plane_ids[(lpa / (domains[tr->stream_id]->channel_no * domains[tr->stream_id]->chip_no * domains[tr->stream_id]->die_no)) % domains[tr->stream_id]->plane_no];
+}
+
+void AddressMappingPageLevel::AllocatePageInPlaneForUserWrite(TransactionWritePtr tr)
+{
+    auto domain = domains[tr->stream_id];
+    uint64_t old_ppa = domain->GetPPA(tr->stream_id, tr->lpa);
+
+    uint64_t prev_page_bitmap = domain->GetPageStatus(tr->stream_id, tr->lpa);
+    uint64_t status_intersection = prev_page_bitmap & tr->write_sectors_bitmap;
+    if (status_intersection == prev_page_bitmap)
+    { // 新写入完全覆盖先前写入的扇区，直接把原page标记为无效
+        PhysicalPageAddressPtr old_address = ConvertPPAtoAddress(old_ppa);
+        block_manager->InvalidatePageInBlock(tr->stream_id, old_address);
+    }
+    else // 新写入未完全覆盖先前的扇区，需要读取旧数据
+    {
+        uint64_t read_page_bitmap = status_intersection ^ prev_page_bitmap; // 新写入没有覆盖到的扇区
+        auto update_read_tr = std::make_shared<TransactionRead>(/*TODO */);
+        ConvertPPAtoAddress(old_ppa, update_read_tr->physical_address);
+        block_manager->ReadTransactionStartedOnBlock(update_read_tr->physical_address);
+        block_manager->InvalidatePageInBlock(tr->stream_id, update_read_tr->physical_address);
+        tr->related_read = update_read_tr;
+    }
+    block_manager->AllocateBlockAndPageInPlaneForUserWrite(tr->stream_id, tr->physical_address);
+    tr->ppa = ConvertAddresstoPPA(tr->physical_address);
+    domain->UpdateMappingInfo(tr->stream_id, tr->lpa, tr->ppa, tr->write_sectors_bitmap | domain->GetPageStatus(tr->stream_id, tr->lpa));
+}
+
+void AddressMappingPageLevel::AllocatePageInPlaneForGCWrite(TransactionWritePtr tr)
+{
+    auto domain = domains[tr->stream_id];
+    uint64_t old_ppa = domain->GetPPA(tr->stream_id, tr->lpa);
+    if (old_ppa == NO_VALUE)
+    {
+        PRINT_ERROR("Unexpected mapping table status for GC write!");
+    }
+    else
+    {
+        PhysicalPageAddressPtr old_address = ConvertPPAtoAddress(old_ppa);
+        block_manager->InvalidatePageInBlock(tr->stream_id, old_address);
+        uint64_t prev_page_bitmap = domain->GetPageStatus(tr->stream_id, tr->lpa);
+        if ((prev_page_bitmap & tr->write_sectors_bitmap) != prev_page_bitmap)
+        {
+            PRINT_ERROR("Unexpected mapping table status for GC write!");
+        }
+    }
+    block_manager->AllocateBlockAndPageInPlaneForGcWrite(tr->stream_id, tr->physical_address);
+    tr->ppa = ConvertAddresstoPPA(tr->physical_address);
+    domain->UpdateMappingInfo(tr->stream_id, tr->lpa, tr->ppa, tr->write_sectors_bitmap | domain->GetPageStatus(tr->stream_id, tr->lpa));
 }

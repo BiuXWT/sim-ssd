@@ -20,11 +20,11 @@ public:
     ~GcWlUnit() = default;
 
     bool GcIsUrgentMode(NandChipPtr chip);
-    void CheckGcRequired(const uint64_t free_block_pool_size, const PhysicalPageAddress &plane_address);
+    void CheckGcRequired(const uint64_t free_block_pool_size, const PhysicalPageAddressPtr plane_address);
     GC_POLICY GetGcPolicy() const { return gc_policy; }
     uint64_t GetGcPolicySpecificParam();
     uint64_t GetMinimumNumberOfFreePagesBeforeGc();
-    bool StopServicingWrites(const PhysicalPageAddress &plane_address);
+    bool StopServicingWrites(const PhysicalPageAddressPtr plane_address);
     bool IsSafeGcCandidate(PlaneBookKeepingPtr plane, uint64_t gc_candidate_block_id);
     bool UseStaticWearLeveling() const { return static_wl_enabled; }
     bool UseDynamicWearLeveling() const { return dynamic_wl_enabled; }

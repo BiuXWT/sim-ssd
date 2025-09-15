@@ -1,42 +1,74 @@
 #pragma once
 #include "param.h"
+
+enum class NandCmd
+{
+    READ = 0x0030,
+    PROGRAM = 0x8000,
+    ERASE = 0x6000,
+    NONE = 0xFFFF
+};
+
 class NandChip;
 using NandChipPtr = std::shared_ptr<NandChip>;
 
-class Page{
+struct NandResult
+{
+    NandCmd cmd;
+    int status;                // 0: success, 其他: 错误码
+    std::vector<uint8_t> data; // 仅READ时有效
+};
+struct NandTask
+{
+    NandCmd cmd;
+    PhysicalPageAddressPtr addr;
+    std::vector<uint8_t> data; // 仅PROGRAM时有效
+    std::shared_ptr<std::promise<NandResult>> promise;
+};
+
+class Page
+{
 public:
-    Page(int page_size):data(page_size,0xFF){}
+    Page(int page_size) : data(page_size, 0xFF) {}
     std::vector<uint8_t> data; // 主数据区
 };
 
-class Block{
+class Block
+{
 public:
-    Block(int block_id, int pages_per_block, int page_size):block_id(block_id), pages(pages_per_block, Page(page_size)){}
+    Block(int block_id, int pages_per_block, int page_size) : block_id(block_id), pages(pages_per_block, Page(page_size)) {}
     uint64_t block_id;
     std::vector<Page> pages;
 };
 
-class Plane{
-    private:
+class Plane
+{
+private:
     double bad_block_ratio = 0.02; // 坏块比例
-    void set_random_bad_blocks(){
+    void set_random_bad_blocks()
+    {
         uint64_t bad_block_count = static_cast<uint64_t>(blocks_no * bad_block_ratio);
-        if(bad_block_count == 0 && bad_block_ratio > 0) bad_block_count = 2; // 至少2个坏块
+        if (bad_block_count == 0 && bad_block_ratio > 0)
+            bad_block_count = 2; // 至少2个坏块
         std::set<uint64_t> bad_blocks_set;
         std::mt19937 rng{std::random_device{}()};
         std::uniform_int_distribution<uint64_t> dist(0, blocks_no - 1);
-        while (bad_blocks_set.size() < bad_block_count) {
+        while (bad_blocks_set.size() < bad_block_count)
+        {
             bad_blocks_set.insert(dist(rng));
         }
         bad_block_ids.assign(bad_blocks_set.begin(), bad_blocks_set.end());
         bad_block_no = bad_block_ids.size();
         healthy_block_no = blocks_no - bad_block_no;
     }
+
 public:
     Plane(int blocks_per_plane, int pages_per_block, int page_size)
-        : blocks_no(blocks_per_plane), pages_per_block(pages_per_block) {
+        : blocks_no(blocks_per_plane), pages_per_block(pages_per_block)
+    {
         blocks.reserve(blocks_no);
-        for (uint64_t i = 0; i < blocks_no; ++i) {
+        for (uint64_t i = 0; i < blocks_no; ++i)
+        {
             blocks.emplace_back(i, pages_per_block, page_size);
         }
         set_random_bad_blocks();
@@ -49,40 +81,57 @@ public:
     std::vector<Block> blocks;
 };
 
-
-class Die{
+class Die
+{
 public:
-    enum class DieStatus { BUSY, IDLE };
+    enum class DieStatus
+    {
+        BUSY,
+        IDLE
+    };
     uint64_t plane_no;
     DieStatus status;
     std::vector<Plane> planes;
 };
 
-class NandChip {
-    enum class InternalState {
+class NandChip
+{
+public:
+    enum class InternalState
+    {
         IDLE,
         BUSY
-    };
-        struct Addr {
-        uint64_t die;
-        uint64_t plane;
-        uint64_t block;
-        uint64_t page;
     };
 
 public:
     NandChip(uint64_t channel_id, uint64_t chip_id, uint64_t dies_per_chip, uint64_t planes_per_die,
-             uint64_t blocks_per_plane, uint64_t pages_per_block,uint64_t page_size);
+             uint64_t blocks_per_plane, uint64_t pages_per_block, uint64_t page_size);
     ~NandChip();
     uint64_t channel_id;
     uint64_t chip_id;
     std::vector<uint8_t> GetMetaData(uint64_t die, uint64_t plane, uint64_t block, uint64_t page);
-    int erase_block(const Addr *addr);
-    int write_page(const Addr *addr, const uint8_t *data);
-    int read_page(const Addr *addr, uint8_t *data);
+
+    std::future<NandResult> push_command(NandCmd cmd, const PhysicalPageAddressPtr addr, const std::vector<uint8_t> &data = {});
 
 private:
+    uint64_t dies_per_chip;
+    uint64_t planes_per_die;
+    uint64_t blocks_per_plane;
+    uint64_t pages_per_block;
+    uint64_t page_size;
 
     std::vector<Die> dies;
 
+    std::queue<NandTask> command_queue;
+    std::mutex mtx;
+    std::condition_variable cv;
+    std::thread worker;
+    bool stop_flag = false;
+
+    InternalState state = InternalState::IDLE;
+    int erase_block(const PhysicalPageAddressPtr addr);
+    int write_page(const PhysicalPageAddressPtr addr, const uint8_t *data);
+    int read_page(const PhysicalPageAddressPtr addr, uint8_t *data);
+
+    void worker_loop();
 };

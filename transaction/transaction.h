@@ -15,25 +15,30 @@ public:
         : channel_id(channel_id), chip_id(chip_id), die_id(die_id), plane_id(plane_id), block_id(block_id), page_id(page_id) {}
     PhysicalPageAddress(const PhysicalPageAddress &other) = default;
 };
+
 class Transaction
 {
 public:
+    Transaction(/*TODO... */) {}
+
     uint64_t transaction_id;
     uint64_t stream_id;
-    TransactionType type;
     TransactionSourceType source;
+    TransactionType type;
     Priority priority;
-    PhysicalPageAddress physical_address;
+    PhysicalPageAddressPtr physical_address;
     bool physical_address_determined; // 物理地址是否已确定
     UserRequestType req_type;
     uint64_t lpa;             // 事务的起始逻辑块地址
     uint64_t ppa;             // 事务的起始物理页地址
     uint64_t size_in_bytes;   // 事务的大小，单位为字节
     uint64_t size_in_sectors; // 事务的大小，单位为扇区
-    std::vector<uint8_t> data;
 };
 class TransactionRead : public Transaction
 {
+public:
+    TransactionRead() {}
+    std::vector<uint8_t> content;
     TransactionWritePtr related_write;
     uint64_t read_sectors_bitmap;
     uint64_t timestamp;
@@ -46,6 +51,9 @@ enum class WriteExecutionModeType
 };
 class TransactionWrite : public Transaction
 {
+public:
+    TransactionWrite() {}
+    std::vector<uint8_t> content;
     TransactionReadPtr related_read;
     TransactionErasePtr related_erase;
     uint64_t write_sectors_bitmap;
@@ -55,5 +63,7 @@ class TransactionWrite : public Transaction
 
 class TransactionErase : public Transaction
 {
+public:
+    TransactionErase() {}
     std::vector<TransactionWritePtr> page_movement_actions;
 };

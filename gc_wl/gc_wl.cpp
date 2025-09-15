@@ -36,14 +36,14 @@ bool GcWlUnit::GcIsUrgentMode(NandChipPtr nand_chip)
     if (!preemptible_gc_enabled)
         return true;
 
-    PhysicalPageAddress addr;
-    addr.channel_id = nand_chip->channel_id;
+    PhysicalPageAddressPtr addr = std::make_shared<PhysicalPageAddress>();
+    addr->channel_id = nand_chip->channel_id;
     for (uint64_t die_id = 0; die_id < die_per_chip; die_id++)
     {
         for (uint64_t plane_id = 0; plane_id < plane_per_die; plane_id++)
         {
-            addr.die_id = die_id;
-            addr.plane_id = plane_id;
+            addr->die_id = die_id;
+            addr->plane_id = plane_id;
             if (block_manager->GetFreeBlockPoolSize(addr) < block_pool_gc_hard_threshold)
             {
                 return true;
@@ -54,7 +54,7 @@ bool GcWlUnit::GcIsUrgentMode(NandChipPtr nand_chip)
     return false;
 }
 
-void GcWlUnit::CheckGcRequired(const uint64_t free_block_pool_size, const PhysicalPageAddress &plane_address)
+void GcWlUnit::CheckGcRequired(const uint64_t free_block_pool_size, const PhysicalPageAddressPtr plane_address)
 {
     if (free_block_pool_size < block_pool_gc_threshold)
     {
@@ -166,7 +166,7 @@ uint64_t GcWlUnit::GetMinimumNumberOfFreePagesBeforeGc()
     return block_pool_gc_threshold;
 }
 
-bool GcWlUnit::StopServicingWrites(const PhysicalPageAddress &plane_address)
+bool GcWlUnit::StopServicingWrites(const PhysicalPageAddressPtr plane_address)
 {
     return block_manager->GetFreeBlockPoolSize(plane_address) < max_ongoing_gc_reqs_per_plane;
 }

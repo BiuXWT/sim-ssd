@@ -85,17 +85,17 @@ public:
     AddressMappingPageLevel();
     ~AddressMappingPageLevel() = default;
     uint64_t GetCMTCapacity();
-    uint64_t GetLogicalPagesNo();
-    uint64_t GetStreamsNo();
+    uint64_t GetLogicalPagesNo(uint64_t stream_id);
+    uint64_t GetStreamsNo() { return total_stream_count; };
 
     void TranslateLpaToPpaAndDispatch(std::list<TransactionPtr> &tr);
     void GetDataMappingForGC(uint64_t stream_id, uint64_t lpa, uint64_t &ppa, uint64_t &write_state_bitmap);
-    void AllocateNewPageForGC(TransactionPtr tr);
+    void AllocateNewPageForGC(TransactionWritePtr tr);
     uint64_t GetDevicePhysicalPagesCount();
     uint64_t GetDeviceLogicalPagesCount();
     CMTSharingMode GetCMTSharingMode() const { return sharing_mode; }
     PhysicalPageAddressPtr ConvertPPAtoAddress(const uint64_t ppa);
-    void ConvertPPAtoAddress(const uint64_t ppa, PhysicalPageAddressPtr &address);
+    void ConvertPPAtoAddress(const uint64_t ppa, PhysicalPageAddressPtr address);
     uint64_t ConvertAddresstoPPA(const PhysicalPageAddressPtr address);
 
     void SetBarrierForPhysicalBlock(const PhysicalPageAddressPtr address);
@@ -105,8 +105,9 @@ public:
 
 private:
     FTLPtr ftl;
+    NandDriverPtr nand_driver;
     BlockManagerPtr block_manager;
-    std::vector<AddressMappingDomainPtr> domain;
+    std::vector<AddressMappingDomainPtr> domains;
     CMTSharingMode sharing_mode;
     uint64_t total_stream_count;
     uint64_t max_logical_sector_address;
@@ -133,13 +134,13 @@ private:
 
     double overprovisioning_ratio;
 
-    void AllocatePlaneForUserWrite(TransactionPtr tr);
-    void AllocatePageInPlaneForUserWrite(TransactionPtr tr, bool is_for_gc);
+    void AllocatePlaneForUserWrite(TransactionWritePtr tr);
+    void AllocatePageInPlaneForUserWrite(TransactionWritePtr tr);
+    void AllocatePageInPlaneForGCWrite(TransactionWritePtr tr);
     bool TranslateLpaToPpa(uint64_t stream_id, TransactionPtr tr);
 
     bool QueryCMT(TransactionPtr tr);
     uint64_t OnlineCreateEntryForRead(uint64_t stream_id, uint64_t lpa, PhysicalPageAddressPtr addr, uint64_t read_sectors_bitmap);
     void ManageUserTransactionFacingBarrier(TransactionPtr tr);
     bool IsLPALockedForGC(const uint64_t stream_id, const uint64_t lpa);
-
 };
