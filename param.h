@@ -164,6 +164,7 @@ class Transaction;
 class TransactionRead;
 class TransactionWrite;
 class TransactionErase;
+class CacheManager;
 
 using FTLPtr = std::shared_ptr<FTL>;
 using TransactionPtr = std::shared_ptr<Transaction>;
@@ -183,3 +184,4 @@ using GcWlUnitPtr = std::shared_ptr<GcWlUnit>;
 using TransactionErasePtr = std::shared_ptr<TransactionErase>;
 using CMTSlotPtr = std::shared_ptr<CMTSlot>;
 using CachedMappingTablePtr = std::shared_ptr<CachedMappingTable>;
+using CacheManagerPtr = std::shared_ptr<CacheManager>;

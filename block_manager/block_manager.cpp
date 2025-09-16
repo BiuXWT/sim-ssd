@@ -312,6 +312,11 @@ bool BlockManager::IsPageValid(const PhysicalPageAddressPtr page_address)
     return (block->invalid_page_bitmap[page_address->page_id / 64] & (1ULL << (page_address->page_id % 64))) == 0;
 }
 
+bool BlockManager::IsPageValid(BlockPtr block, uint64_t page_id)
+{
+    return (block->invalid_page_bitmap[page_id / 64] & (1ULL << (page_id % 64))) == 0;
+}
+
 void BlockManager::ProgramTransactionIssued(PhysicalPageAddressPtr page_address)
 {
     auto plane = GetPlaneBookKeepingEntry(page_address);

@@ -85,6 +85,7 @@ public:
     void ProgramTransactionFinishedOnBlock(const PhysicalPageAddressPtr block_address);
     bool IsHavingOngoingProgramOnBlock(const PhysicalPageAddressPtr block_address);
     bool IsPageValid(const PhysicalPageAddressPtr page_address);
+    bool IsPageValid(BlockPtr block, uint64_t page_id);
 
 private:
     GcWlUnitPtr gc_unit;

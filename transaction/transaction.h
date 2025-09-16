@@ -19,7 +19,13 @@ public:
 class Transaction
 {
 public:
-    Transaction(/*TODO... */) {}
+    Transaction(uint64_t stream_id, TransactionSourceType source, TransactionType type, Priority priority,
+                PhysicalPageAddressPtr physical_address, bool physical_address_determined, UserRequestType req_type,
+                uint64_t lpa, uint64_t ppa, uint64_t size_in_bytes, uint64_t size_in_sectors)
+        : stream_id(stream_id), source(source), type(type), priority(priority),
+          physical_address(physical_address), physical_address_determined(physical_address_determined),
+          req_type(req_type), lpa(lpa), ppa(ppa), size_in_bytes(size_in_bytes), size_in_sectors(size_in_sectors) {}
+    virtual ~Transaction() = default;
 
     uint64_t transaction_id;
     uint64_t stream_id;
@@ -37,7 +43,11 @@ public:
 class TransactionRead : public Transaction
 {
 public:
-    TransactionRead() {}
+    TransactionRead(uint64_t stream_id, TransactionSourceType source, TransactionType type, Priority priority,
+                    PhysicalPageAddressPtr physical_address, bool physical_address_determined, UserRequestType req_type,
+                    uint64_t lpa, uint64_t ppa, uint64_t size_in_bytes, uint64_t size_in_sectors)
+        : Transaction(stream_id, source, type, priority, physical_address, physical_address_determined, req_type,
+                      lpa, ppa, size_in_bytes, size_in_sectors) {}
     std::vector<uint8_t> content;
     TransactionWritePtr related_write;
     uint64_t read_sectors_bitmap;
@@ -52,7 +62,11 @@ enum class WriteExecutionModeType
 class TransactionWrite : public Transaction
 {
 public:
-    TransactionWrite() {}
+    TransactionWrite(uint64_t stream_id, TransactionSourceType source, TransactionType type, Priority priority,
+                     PhysicalPageAddressPtr physical_address, bool physical_address_determined, UserRequestType req_type,
+                     uint64_t lpa, uint64_t ppa, uint64_t size_in_bytes, uint64_t size_in_sectors)
+        : Transaction(stream_id, source, type, priority, physical_address, physical_address_determined, req_type,
+                      lpa, ppa, size_in_bytes, size_in_sectors) {}
     std::vector<uint8_t> content;
     TransactionReadPtr related_read;
     TransactionErasePtr related_erase;
@@ -64,6 +78,10 @@ public:
 class TransactionErase : public Transaction
 {
 public:
-    TransactionErase() {}
+    TransactionErase(uint64_t stream_id, TransactionSourceType source, TransactionType type, Priority priority,
+                     PhysicalPageAddressPtr physical_address, bool physical_address_determined, UserRequestType req_type,
+                     uint64_t lpa, uint64_t ppa, uint64_t size_in_bytes, uint64_t size_in_sectors)
+        : Transaction(stream_id, source, type, priority, physical_address, physical_address_determined, req_type,
+                      lpa, ppa, size_in_bytes, size_in_sectors) {}
     std::vector<TransactionWritePtr> page_movement_actions;
 };

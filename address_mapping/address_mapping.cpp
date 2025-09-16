@@ -1,6 +1,9 @@
 #include "address_mapping.h"
 #include "transaction.h"
 #include "block_manager.h"
+#include "ftl.h"
+#include "gc_wl.h"
+#include "nand_driver.h"
 
 bool CachedMappingTable::Exists(uint64_t stream_id, uint64_t lpa)
 {
@@ -262,6 +265,59 @@ void AddressMappingPageLevel::ConvertPPAtoAddress(const uint64_t ppa, PhysicalPa
     address->page_id = (((((ppa % pages_per_channel) % pages_per_chip) % pages_per_die) % pages_per_plane) % pages_per_block);
 }
 
+uint64_t AddressMappingPageLevel::ConvertAddresstoPPA(const PhysicalPageAddressPtr address)
+{
+    return pages_per_chip * (address->channel_id * chips_per_channel + address->chip_id) + pages_per_die * address->die_id + pages_per_plane * address->plane_id + pages_per_block * address->block_id + address->page_id;
+}
+
+void AddressMappingPageLevel::SetBarrierForPhysicalBlock(const PhysicalPageAddressPtr address)
+{
+    auto block = block_manager->GetPlaneBookKeepingEntry(address)->blocks[address->block_id];
+    auto addr = std::make_shared<PhysicalPageAddress>(*address);
+    for (uint64_t page_id = 0; page_id < block->current_write_page_index; ++page_id)
+    {
+        if (block_manager->IsPageValid(block, page_id))
+        {
+            addr->page_id = page_id;
+            uint64_t lpa = nand_driver->GetLPA(addr);
+            uint64_t ppa = domains[block->stream_id]->GetPPA(block->stream_id, lpa);
+            if (domains[block->stream_id]->cmt->Exists(block->stream_id, lpa))
+            {
+                ppa = domains[block->stream_id]->cmt->RetrievePPA(block->stream_id, lpa);
+            }
+            if (ppa != ConvertAddresstoPPA(addr))
+            {
+                PRINT_ERROR("Inconsistent mapping table between FTL and NAND driver!")
+            }
+            SetBarrierForLPA(block->stream_id, lpa);
+        }
+    }
+}
+
+void AddressMappingPageLevel::SetBarrierForLPA(const uint64_t stream_id, const uint64_t lpa)
+{
+    auto it = domains[stream_id]->locked_lpa.find(lpa);
+    if (it != domains[stream_id]->locked_lpa.end())
+    {
+        PRINT_ERROR("LPA already locked!");
+    }
+    domains[stream_id]->locked_lpa.insert(lpa);
+}
+
+void AddressMappingPageLevel::RemoveBarrierForLPA(const uint64_t stream_id, const uint64_t lpa)
+{
+    auto it = domains[stream_id]->locked_lpa.find(lpa);
+    if (it == domains[stream_id]->locked_lpa.end())
+    {
+        PRINT_ERROR("LPA not locked!");
+    }
+    domains[stream_id]->locked_lpa.erase(it);
+    // TODO...
+    // read behind barrier
+
+    // program behind barrier
+}
+
 void AddressMappingPageLevel::AllocatePlaneForUserWrite(TransactionWritePtr tr)
 {
     uint64_t lpa = tr->lpa;
@@ -288,6 +344,7 @@ void AddressMappingPageLevel::AllocatePageInPlaneForUserWrite(TransactionWritePt
     else // 新写入未完全覆盖先前的扇区，需要读取旧数据
     {
         uint64_t read_page_bitmap = status_intersection ^ prev_page_bitmap; // 新写入没有覆盖到的扇区
+        read_page_bitmap &= 1;                                              // delete
         auto update_read_tr = std::make_shared<TransactionRead>(/*TODO */);
         ConvertPPAtoAddress(old_ppa, update_read_tr->physical_address);
         block_manager->ReadTransactionStartedOnBlock(update_read_tr->physical_address);
@@ -320,4 +377,88 @@ void AddressMappingPageLevel::AllocatePageInPlaneForGCWrite(TransactionWritePtr 
     block_manager->AllocateBlockAndPageInPlaneForGcWrite(tr->stream_id, tr->physical_address);
     tr->ppa = ConvertAddresstoPPA(tr->physical_address);
     domain->UpdateMappingInfo(tr->stream_id, tr->lpa, tr->ppa, tr->write_sectors_bitmap | domain->GetPageStatus(tr->stream_id, tr->lpa));
+}
+
+bool AddressMappingPageLevel::TranslateLpaToPpa(uint64_t stream_id, TransactionPtr tr)
+{
+    auto domain = domains[stream_id];
+    auto ppa = domain->GetPPA(stream_id, tr->lpa);
+    if (tr->type == TransactionType::READ)
+    {
+        if (ppa == NO_VALUE)
+        {
+            ppa = OnlineCreateEntryForRead(stream_id, tr->lpa, tr->physical_address, static_cast<TransactionRead *>(tr.get())->read_sectors_bitmap);
+        }
+        tr->ppa = ppa;
+        ConvertPPAtoAddress(ppa, tr->physical_address);
+        block_manager->ReadTransactionStartedOnBlock(tr->physical_address);
+        tr->physical_address_determined = true;
+        return true;
+    }
+    else
+    {
+        AllocatePlaneForUserWrite(std::dynamic_pointer_cast<TransactionWrite>(tr));
+        if (ftl->gcwl_unit->StopServicingWrites(tr->physical_address))
+        {
+            return false;
+        }
+        AllocatePageInPlaneForUserWrite(std::dynamic_pointer_cast<TransactionWrite>(tr));
+        tr->physical_address_determined = true;
+        return true;
+    }
+}
+
+bool AddressMappingPageLevel::QueryCMT(TransactionPtr tr)
+{
+    uint64_t stream_id = tr->stream_id;
+    if (domains[stream_id]->Mapping_entry_accessible(stream_id, tr->lpa))
+    {
+        if (TranslateLpaToPpa(stream_id, tr))
+        {
+            return true;
+        }
+        else
+        {
+            ManageUnsuccessfulTransaction(tr);
+            return false;
+        }
+    }
+    return false;
+}
+
+uint64_t AddressMappingPageLevel::OnlineCreateEntryForRead(uint64_t stream_id, uint64_t lpa, PhysicalPageAddressPtr addr, uint64_t read_sectors_bitmap)
+{
+    auto domain = domains[stream_id];
+    addr->channel_id = domain->channel_ids[lpa % domain->channel_no];
+    addr->chip_id = domain->chip_ids[(lpa / domain->channel_no) % domain->chip_no];
+    addr->die_id = domain->die_ids[(lpa / (domain->channel_no * domain->chip_no)) % domain->die_no];
+    addr->plane_id = domain->plane_ids[(lpa / (domain->channel_no * domain->chip_no * domain->die_no)) % domain->plane_no];
+
+    block_manager->AllocateBlockAndPageInPlaneForUserWrite(stream_id, addr);
+    uint64_t ppa = ConvertAddresstoPPA(addr);
+    domain->UpdateMappingInfo(stream_id, lpa, ppa, read_sectors_bitmap);
+    return ppa;
+}
+
+void AddressMappingPageLevel::ManageUnsuccessfulTransaction(TransactionPtr tr)
+{
+    Write_transactions_for_overfull_planes[tr->physical_address->channel_id][tr->physical_address->chip_id][tr->physical_address->die_id]->insert(std::dynamic_pointer_cast<TransactionWrite>(tr));
+}
+
+void AddressMappingPageLevel::ManageUserTransactionFacingBarrier(TransactionPtr tr)
+{
+    auto domain = domains[tr->stream_id];
+    if (tr->type == TransactionType::READ)
+    {
+        domain->read_transactions_behind_LPA_barrier.insert({tr->lpa, tr});
+    }
+    else
+    {
+        domain->program_transactions_behind_LPA_barrier.insert({tr->lpa, tr});
+    }
+}
+
+bool AddressMappingPageLevel::IsLPALockedForGC(const uint64_t stream_id, const uint64_t lpa)
+{
+    return domains[stream_id]->locked_lpa.find(lpa) != domains[stream_id]->locked_lpa.end();
 }

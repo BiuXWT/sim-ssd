@@ -91,8 +91,8 @@ public:
     void TranslateLpaToPpaAndDispatch(std::list<TransactionPtr> &tr);
     void GetDataMappingForGC(uint64_t stream_id, uint64_t lpa, uint64_t &ppa, uint64_t &write_state_bitmap);
     void AllocateNewPageForGC(TransactionWritePtr tr);
-    uint64_t GetDevicePhysicalPagesCount();
-    uint64_t GetDeviceLogicalPagesCount();
+    uint64_t GetDevicePhysicalPagesCount() { return total_physical_pages_no; };
+    uint64_t GetDeviceLogicalPagesCount(uint64_t stream_id) { return domains[stream_id]->total_logical_page_no; };
     CMTSharingMode GetCMTSharingMode() const { return sharing_mode; }
     PhysicalPageAddressPtr ConvertPPAtoAddress(const uint64_t ppa);
     void ConvertPPAtoAddress(const uint64_t ppa, PhysicalPageAddressPtr address);
@@ -130,7 +130,7 @@ private:
     uint64_t pages_per_chip;
     uint64_t pages_per_die;
     uint64_t pages_per_plane;
-    std::unique_ptr<std::set<TransactionPtr> ***[]> Write_transactions_for_overfull_planes;
+    std::unique_ptr<std::set<TransactionWritePtr> ***[]> Write_transactions_for_overfull_planes;
 
     double overprovisioning_ratio;
 
@@ -141,6 +141,7 @@ private:
 
     bool QueryCMT(TransactionPtr tr);
     uint64_t OnlineCreateEntryForRead(uint64_t stream_id, uint64_t lpa, PhysicalPageAddressPtr addr, uint64_t read_sectors_bitmap);
+    void ManageUnsuccessfulTransaction(TransactionPtr tr);
     void ManageUserTransactionFacingBarrier(TransactionPtr tr);
     bool IsLPALockedForGC(const uint64_t stream_id, const uint64_t lpa);
 };
